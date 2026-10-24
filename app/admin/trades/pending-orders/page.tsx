@@ -11,7 +11,9 @@ import {
   Copy,
   DollarSign,
   Hash,
+  Pencil,
   Search,
+  Trash2,
   SlidersHorizontal,
   Sparkles,
   Timer,
@@ -19,11 +21,20 @@ import {
   Wallet,
   XCircle,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import GlobalLoader from "@/app/admin/components/ui/GlobalLoader";
 import Pagination from "@/app/admin/components/ui/pagination";
 import DragScroll from "@/app/admin/components/ui/DragScroll";
 import { useTradeAdminPendingOrders } from "@/hooks/useTradeAdminPendingOrders";
+import {
+  useTradeAdminDeleteTrade,
+  useTradeAdminModifyPendingOrder,
+} from "@/hooks/useTradeAdminOrderActions";
+import {
+  displayAccountLabel,
+  displayTicket,
+  displayUserLabel,
+} from "@/utils/displayIds";
+import TradeEditModal from "@/app/admin/components/trades/TradeEditModal";
 import type {
   TradeAdminPendingOrder,
   TradeAdminPendingOrderStatus,
@@ -168,7 +179,6 @@ function getStatusClass(status?: string) {
 }
 
 export default function PendingOrdersPage() {
-  const router = useRouter();
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [copyToast, setCopyToast] = useState("");
@@ -178,6 +188,13 @@ export default function PendingOrdersPage() {
     getDefaultFilters
   );
   const [filters, setFilters] = useState<PendingOrderFilters>(getDefaultFilters);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editOrder, setEditOrder] = useState<TradeAdminPendingOrder | null>(
+    null
+  );
+  const [editError, setEditError] = useState("");
+  const modifyPendingMutation = useTradeAdminModifyPendingOrder();
+  const deleteTradeMutation = useTradeAdminDeleteTrade();
 
   const pendingOrdersQuery = useTradeAdminPendingOrders({
     page,
@@ -254,6 +271,90 @@ export default function PendingOrdersPage() {
       setCopyToast("Copy failed");
       setTimeout(() => setCopyToast(""), 1800);
     }
+  };
+
+  const isEditablePending = (order: TradeAdminPendingOrder) => {
+    const status = (order.status ?? "").toUpperCase();
+    return status === "PENDING" || status === "OPEN" || status === "";
+  };
+
+  const openEdit = (order: TradeAdminPendingOrder) => {
+    setEditOrder(order);
+    setEditError("");
+    setEditOpen(true);
+  };
+
+  const closeEdit = () => {
+    setEditOpen(false);
+    setEditOrder(null);
+    setEditError("");
+  };
+
+  const handleDeletePending = (order: TradeAdminPendingOrder) => {
+    if (!window.confirm(`Delete pending order ${displayTicket(order)}?`)) return;
+    deleteTradeMutation.mutate(
+      {
+        kind: "PENDING",
+        accountId: order.accountId,
+        userId: order.userId,
+        orderId: order.orderId,
+      },
+      {
+        onSuccess: () => {
+          setCopyToast("Pending order deleted.");
+          setTimeout(() => setCopyToast(""), 1800);
+          pendingOrdersQuery.refetch();
+        },
+        onError: (err: unknown) => {
+          const msg =
+            typeof err === "object" && err !== null
+              ? ((err as { response?: { data?: { message?: string } } }).response
+                  ?.data?.message ??
+                (err as { message?: string }).message)
+              : undefined;
+          setCopyToast(msg || "Delete failed.");
+          setTimeout(() => setCopyToast(""), 2200);
+        },
+      }
+    );
+  };
+
+  const handlePendingEditSubmit = (payload: Record<string, unknown>) => {
+    modifyPendingMutation.mutate(
+      {
+        accountId: String(payload.accountId),
+        orderId: String(payload.orderId),
+        userId: String(payload.userId),
+        volume:
+          typeof payload.volume === "number" ? payload.volume : undefined,
+        price: typeof payload.price === "number" ? payload.price : undefined,
+        stopLoss:
+          payload.stopLoss === undefined
+            ? undefined
+            : (payload.stopLoss as number | null),
+        takeProfit:
+          payload.takeProfit === undefined
+            ? undefined
+            : (payload.takeProfit as number | null),
+      },
+      {
+        onSuccess: () => {
+          setCopyToast("Pending order updated.");
+          setTimeout(() => setCopyToast(""), 1800);
+          closeEdit();
+          pendingOrdersQuery.refetch();
+        },
+        onError: (err: unknown) => {
+          const msg =
+            typeof err === "object" && err !== null
+              ? ((err as { response?: { data?: { message?: string } } }).response
+                  ?.data?.message ??
+                (err as { message?: string }).message)
+              : undefined;
+          setEditError(msg || "Pending order update failed.");
+        },
+      }
+    );
   };
 
   return (
@@ -568,12 +669,12 @@ export default function PendingOrdersPage() {
                     </th>
                     <th className="px-4 py-3">
                       <span className="inline-flex items-center gap-1">
-                        <User size={12} /> User ID
+                        <User size={12} /> User
                       </span>
                     </th>
                     <th className="px-4 py-3">
                       <span className="inline-flex items-center gap-1">
-                        <Wallet size={12} /> Account ID
+                        <Wallet size={12} /> Account
                       </span>
                     </th>
                     <th className="px-4 py-3">
@@ -606,17 +707,14 @@ export default function PendingOrdersPage() {
                         <Clock3 size={12} /> Expire
                       </span>
                     </th>
+                    <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((order) => (
                     <tr
                       key={order._id}
-                      className="border-t border-[var(--card-border)] hover:bg-[var(--hover-bg)]/60 cursor-pointer"
-                      onClick={() => {
-                        if (!order.userId) return;
-                        router.push(`/admin/users/users/view/${order.userId}`);
-                      }}
+                      className="border-t border-[var(--card-border)] hover:bg-[var(--hover-bg)]/60"
                     >
                       <td className="whitespace-nowrap px-4 py-3 font-semibold">
                         {order.symbol || "--"}
@@ -636,30 +734,30 @@ export default function PendingOrdersPage() {
                       <td className="px-4 py-3">
                         <StatusBadge status={order.status} />
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
+                      <td className="whitespace-nowrap px-4 py-3 text-xs">
                         <CopyableValue
-                          value={order.userId}
-                          label="User ID"
+                          value={displayUserLabel(order)}
+                          label="User"
                           onCopy={handleCopy}
                         />
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
                         <CopyableValue
-                          value={order.accountId}
-                          label="Account ID"
+                          value={displayAccountLabel(order)}
+                          label="Account"
                           onCopy={handleCopy}
                         />
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
                         <CopyableValue
-                          value={order.orderId}
+                          value={displayTicket(order)}
                           label="Order ID"
                           onCopy={handleCopy}
                         />
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
                         <CopyableValue
-                          value={order.executedPositionId}
+                          value={order.executedPositionId || "--"}
                           label="Position ID"
                           onCopy={handleCopy}
                         />
@@ -676,6 +774,34 @@ export default function PendingOrdersPage() {
                       <td className="whitespace-nowrap px-4 py-3 text-xs">
                         {formatDateTime(order.expireAt ?? undefined)}
                       </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right">
+                        <div className="inline-flex items-center justify-end gap-2">
+                          {isEditablePending(order) ? (
+                            <button
+                              type="button"
+                              onClick={() => openEdit(order)}
+                              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] px-2.5 py-1 text-xs font-semibold hover:bg-[var(--hover-bg)]"
+                            >
+                              <Pencil size={12} />
+                              Modify
+                            </button>
+                          ) : null}
+                          {isEditablePending(order) ? (
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePending(order)}
+                              className="inline-flex items-center gap-1.5 rounded-md border border-rose-500/40 bg-rose-500/10 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-500/20"
+                            >
+                              <Trash2 size={12} />
+                              Delete
+                            </button>
+                          ) : (
+                            <span className="text-xs text-[var(--text-muted)]">
+                              —
+                            </span>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -688,6 +814,9 @@ export default function PendingOrdersPage() {
                   key={`mobile-${order._id}`}
                   order={order}
                   onCopy={handleCopy}
+                  onEdit={
+                    isEditablePending(order) ? () => openEdit(order) : undefined
+                  }
                 />
               ))}
             </div>
@@ -711,6 +840,32 @@ export default function PendingOrdersPage() {
           {copyToast}
         </div>
       ) : null}
+
+      <TradeEditModal
+        open={editOpen}
+        mode="pending"
+        trade={
+          editOrder
+            ? {
+                accountId: editOrder.accountId,
+                userId: editOrder.userId,
+                orderId: editOrder.orderId,
+                ticket: editOrder.ticket,
+                accountNumber: editOrder.accountNumber,
+                symbol: editOrder.symbol,
+                side: String(editOrder.side),
+                volume: editOrder.volume,
+                price: editOrder.price,
+                stopLoss: editOrder.stopLoss,
+                takeProfit: editOrder.takeProfit,
+              }
+            : null
+        }
+        saving={modifyPendingMutation.isPending}
+        error={editError}
+        onClose={closeEdit}
+        onSubmit={handlePendingEditSubmit}
+      />
     </div>
   );
 }
@@ -826,9 +981,11 @@ function MetricCard({
 function MobileOrderCard({
   order,
   onCopy,
+  onEdit,
 }: {
   order: TradeAdminPendingOrder;
   onCopy: (value: string, label: string) => void;
+  onEdit?: () => void;
 }) {
   return (
     <div className="rounded-xl border border-[var(--card-border)] bg-gradient-to-br from-[var(--input-bg)] via-[var(--input-bg)] to-sky-500/[0.04] p-3">
@@ -837,7 +994,19 @@ function MobileOrderCard({
           <Timer size={14} className="text-sky-600" />
           {order.symbol || "--"}
         </p>
-        <StatusBadge status={order.status} />
+        <div className="flex items-center gap-2">
+          <StatusBadge status={order.status} />
+          {onEdit ? (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="inline-flex items-center gap-1 rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] px-2 py-1 text-[10px] font-semibold hover:bg-[var(--hover-bg)]"
+            >
+              <Pencil size={11} />
+              Modify
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-2 flex items-center justify-between text-xs">
@@ -868,11 +1037,23 @@ function MobileOrderCard({
         <SmallField label="Expire" value={formatDateTime(order.expireAt ?? undefined)} />
       </div>
 
-      <MobileIdRow label="User" value={order.userId} onCopy={onCopy} />
-      <MobileIdRow label="Account" value={order.accountId} onCopy={onCopy} />
-      <MobileIdRow label="Order" value={order.orderId} onCopy={onCopy} />
       <MobileIdRow
-        label="Position"
+        label="User"
+        value={displayUserLabel(order)}
+        onCopy={onCopy}
+      />
+      <MobileIdRow
+        label="Account"
+        value={displayAccountLabel(order)}
+        onCopy={onCopy}
+      />
+      <MobileIdRow
+        label="Order ID"
+        value={displayTicket(order)}
+        onCopy={onCopy}
+      />
+      <MobileIdRow
+        label="Position ID"
         value={order.executedPositionId || ""}
         onCopy={onCopy}
       />

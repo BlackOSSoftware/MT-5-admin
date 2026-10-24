@@ -41,8 +41,22 @@ export default function AdminLogin() {
           router.push("/admin");
         },
 
-        onError: () => {
-          setErrorMsg("Invalid email or password");
+        onError: (err: unknown) => {
+          const axiosErr = err as {
+            code?: string;
+            message?: string;
+            response?: { data?: { message?: string }; status?: number };
+          };
+          if (
+            axiosErr?.code === "ERR_NETWORK" ||
+            axiosErr?.message === "Network Error"
+          ) {
+            setErrorMsg("Backend unreachable. Is the API running on :4000?");
+            return;
+          }
+          setErrorMsg(
+            axiosErr?.response?.data?.message || "Invalid email or password"
+          );
         },
       }
     );
@@ -216,7 +230,7 @@ export default function AdminLogin() {
 
           {/* Footer */}
           <div className="mt-6 text-center text-xs text-[var(--text-muted)]">
-            © {new Date().getFullYear()} Forex Broker System
+            © {new Date().getFullYear()} oceanaprofx
           </div>
 
         </motion.div>

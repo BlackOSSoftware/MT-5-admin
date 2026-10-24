@@ -586,7 +586,6 @@ export default function CreateTraderFund() {
               </div>
 
               <div className="mt-4 rounded-lg border border-white/40 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 p-3 text-xs sm:text-sm backdrop-blur-sm dark:border-white/15">
-                <p>{successActionLabel} ID: {submitSuccess.data._id}</p>
                 <p>Amount: {submitSuccess.data.amount}</p>
                 <p>Status: {submitSuccess.data.status}</p>
               </div>

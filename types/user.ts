@@ -7,6 +7,8 @@ export type AdminUser = {
   isMailVerified: boolean;
   kycStatus: string;
   createdAt: string;
+  isOnline?: boolean;
+  lastSeenAt?: string | null;
 };
 
 export type UserListPagination = {
@@ -39,6 +41,8 @@ export type AdminUserProfile = {
   isMailVerified?: boolean;
   kycStatus?: string;
   createdAt?: string;
+  isOnline?: boolean;
+  lastSeenAt?: string | null;
   date_of_birth?: string;
   gender?: string;
   address_line_1?: string;

@@ -164,7 +164,9 @@ export default function InquiryPage() {
                       <p className="text-xs text-[var(--text-muted)]">{item.title}</p>
                     </div>
                     <span className="inline-flex items-center rounded-full border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold text-sky-700">
-                      #{item._id.slice(-6).toUpperCase()}
+                      {item.createdAt
+                        ? new Date(item.createdAt).toLocaleDateString("en-GB")
+                        : "Inquiry"}
                     </span>
                   </div>
 

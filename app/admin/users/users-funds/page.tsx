@@ -172,7 +172,6 @@ export default function UserFundsPage() {
     const header = [
       "User",
       "Email",
-      "User ID",
       "User Type",
       "Mail Verified",
       "KYC Status",
@@ -186,7 +185,6 @@ export default function UserFundsPage() {
     const rows = rowsForCsv.map((row) => [
       row.name ?? row.fullName ?? "--",
       row.email ?? "--",
-      row.userId ?? row._id ?? "--",
       row.userType ?? "--",
       row.isMailVerified === true
         ? "true"
@@ -409,7 +407,6 @@ export default function UserFundsPage() {
               <thead className="bg-[var(--input-bg)] text-xs uppercase text-[var(--text-muted)]">
                 <tr>
                   <th className="px-4 py-3">User</th>
-                  <th className="px-4 py-3">User ID</th>
                   <th className="px-4 py-3">Type</th>
                   <th className="px-4 py-3">Mail</th>
                   <th className="px-4 py-3">KYC</th>
@@ -546,7 +543,6 @@ function UserFundsRow({ row }: { row: TradeAdminUserFundsItem }) {
         <p className="font-semibold">{userName}</p>
         <p className="text-xs text-[var(--text-muted)]">{email}</p>
       </td>
-      <td className="px-4 py-3 font-mono text-xs">{userId}</td>
       <td className="px-4 py-3">{userType}</td>
       <td className="px-4 py-3">
         <span

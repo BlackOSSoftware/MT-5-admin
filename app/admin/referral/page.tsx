@@ -198,13 +198,13 @@ const resolveUser = (row: RewardRow, kind: "referrer" | "referred") => {
 
 const getUserDisplay = (user: { id?: string; name?: string; email?: string }) => {
   const hasName = Boolean(user.name && user.name !== "--");
-  const primary = hasName ? (user.name as string) : user.id || "--";
-  const secondary =
-    user.email && user.email !== "--"
-      ? user.email
-      : hasName
-      ? user.id || "--"
+  const hasEmail = Boolean(user.email && user.email !== "--");
+  const primary = hasName
+    ? (user.name as string)
+    : hasEmail
+      ? (user.email as string)
       : "--";
+  const secondary = hasEmail && hasName ? (user.email as string) : "--";
   return { primary, secondary };
 };
 
@@ -821,9 +821,11 @@ export default function ReferralPage() {
                       </span>
                     </div>
                     <div className="rounded-xl border border-[var(--card-border)] bg-[var(--input-bg)] px-3 py-2">
-                      <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Reward ID</p>
-                      <p className="text-xs font-mono text-[var(--foreground)] break-all">
-                        {getRewardId(selected) || "--"}
+                      <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                        Reward Status
+                      </p>
+                      <p className="text-xs font-semibold text-[var(--foreground)]">
+                        {selected.status ?? "--"}
                       </p>
                     </div>
                   </div>

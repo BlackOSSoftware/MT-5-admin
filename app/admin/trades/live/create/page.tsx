@@ -94,7 +94,9 @@ export default function CreateTradePage() {
     message?: string;
     referenceId?: string;
     userId: string;
+    userLabel: string;
     accountId: string;
+    accountLabel: string;
     symbol: string;
     side: TradeSide;
     mode: "MARKET" | "PENDING";
@@ -292,26 +294,23 @@ export default function CreateTradePage() {
     const buildReferenceId = (resp: unknown): string | undefined => {
       if (!resp || typeof resp !== "object") return undefined;
       const record = resp as Record<string, unknown>;
-      const direct =
-        record.orderId ??
-        record.positionId ??
-        record.tradeId ??
-        record.id ??
-        record._id;
-      if (direct !== undefined && direct !== null) return String(direct);
+      const pickRef = (obj: Record<string, unknown>) => {
+        const ticket = obj.ticket;
+        if (ticket !== undefined && ticket !== null && String(ticket).trim()) {
+          return String(ticket);
+        }
+        const preferred =
+          obj.orderId ?? obj.positionId ?? obj.tradeId ?? obj.id;
+        if (preferred !== undefined && preferred !== null) return String(preferred);
+        return undefined;
+      };
+
+      const direct = pickRef(record);
+      if (direct) return direct;
 
       const nested = record.data;
       if (!nested || typeof nested !== "object") return undefined;
-      const nestedRecord = nested as Record<string, unknown>;
-      const nestedDirect =
-        nestedRecord.orderId ??
-        nestedRecord.positionId ??
-        nestedRecord.tradeId ??
-        nestedRecord.id ??
-        nestedRecord._id;
-
-      if (nestedDirect === undefined || nestedDirect === null) return undefined;
-      return String(nestedDirect);
+      return pickRef(nested as Record<string, unknown>);
     };
 
     if (mode === "MARKET") {
@@ -334,7 +333,11 @@ export default function CreateTradePage() {
               message: resp?.message,
               referenceId: buildReferenceId(resp?.data ?? resp),
               userId: selectedUser._id,
+              userLabel:
+                selectedUser.email || selectedUser.name || selectedUser._id,
               accountId,
+              accountLabel:
+                selectedAccount?.account_number || accountId,
               symbol: symbol.toUpperCase(),
               side,
               mode: "MARKET",
@@ -385,7 +388,11 @@ export default function CreateTradePage() {
             message: resp?.message,
             referenceId: buildReferenceId(resp?.data ?? resp),
             userId: selectedUser._id,
+            userLabel:
+              selectedUser.email || selectedUser.name || selectedUser._id,
             accountId,
+            accountLabel:
+              selectedAccount?.account_number || accountId,
             symbol: symbol.toUpperCase(),
             side: getSideFromOrderType(pendingOrderType),
             mode: "PENDING",
@@ -553,7 +560,8 @@ export default function CreateTradePage() {
             )}
             {selectedUser ? (
               <p className="mt-2 text-xs text-[var(--text-muted)]">
-                Selected user: {selectedUser._id}
+                Selected user:{" "}
+                {selectedUser.email || selectedUser.name || selectedUser._id}
               </p>
             ) : null}
           </div>
@@ -888,10 +896,10 @@ export default function CreateTradePage() {
               <div className="rounded-xl border border-[var(--card-border)] bg-[var(--input-bg)] p-4 sm:col-span-2">
                 <p className="text-xs text-[var(--text-muted)]">Account</p>
                 <p className="mt-1 font-mono text-xs text-[var(--foreground)]">
-                  {receipt.accountId}
+                  {receipt.accountLabel || receipt.accountId}
                 </p>
                 <p className="mt-2 text-xs text-[var(--text-muted)]">
-                  User: {receipt.userId}
+                  User: {receipt.userLabel || receipt.userId}
                 </p>
               </div>
             </div>

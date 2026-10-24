@@ -3,10 +3,9 @@ export default function GlobalLoader() {
     <div className="flex flex-col items-center justify-center gap-4">
 
       {/* LOGO TEXT */}
-      <div className="text-4xl font-extrabold tracking-wider">
-        <span className="text-[var(--foreground)]">A</span>
-        <span className="text-[var(--primary)]">L</span>
-        <span className="text-[var(--foreground)]">S</span>
+      <div className="text-2xl font-extrabold tracking-wider lowercase">
+        <span className="text-[var(--foreground)]">oceana</span>
+        <span className="text-[var(--primary)]">profx</span>
       </div>
 
       {/* MARKET WAVE */}

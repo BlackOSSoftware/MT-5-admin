@@ -2,16 +2,22 @@ import { useMutation } from "@tanstack/react-query";
 import {
   cancelTradeAdminPendingOrder,
   closeTradeAdminPosition,
+  deleteTradeAdminTrade,
+  modifyTradeAdminClosedTrade,
   modifyTradeAdminPendingOrder,
   modifyTradeAdminPosition,
   placeTradeAdminMarketOrder,
   placeTradeAdminPendingOrder,
+  restoreTradeAdminTrade,
+  type TradeAdminClosedModifyPayload,
+  type TradeAdminDeletePayload,
   type TradeAdminMarketOrderPayload,
   type TradeAdminPendingCancelPayload,
   type TradeAdminPendingModifyPayload,
   type TradeAdminPendingOrderPayload,
   type TradeAdminPositionClosePayload,
   type TradeAdminPositionModifyPayload,
+  type TradeAdminRestorePayload,
 } from "@/services/tradeAdmin.service";
 
 export const useTradeAdminPlaceMarketOrder = () =>
@@ -48,4 +54,22 @@ export const useTradeAdminClosePosition = () =>
   useMutation({
     mutationFn: (payload: TradeAdminPositionClosePayload) =>
       closeTradeAdminPosition(payload),
+  });
+
+export const useTradeAdminModifyClosedTrade = () =>
+  useMutation({
+    mutationFn: (payload: TradeAdminClosedModifyPayload) =>
+      modifyTradeAdminClosedTrade(payload),
+  });
+
+export const useTradeAdminDeleteTrade = () =>
+  useMutation({
+    mutationFn: (payload: TradeAdminDeletePayload) =>
+      deleteTradeAdminTrade(payload),
+  });
+
+export const useTradeAdminRestoreTrade = () =>
+  useMutation({
+    mutationFn: (payload: TradeAdminRestorePayload) =>
+      restoreTradeAdminTrade(payload),
   });

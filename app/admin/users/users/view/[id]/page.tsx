@@ -67,11 +67,18 @@ import {
   useTradeAdminCancelPendingOrder,
   useTradeAdminModifyPosition,
   useTradeAdminClosePosition,
+  useTradeAdminModifyClosedTrade,
 } from "@/hooks/useTradeAdminOrderActions";
 import type { AdminAccount, AdminAccountUpdatePayload } from "@/types/account";
 import type { AdminUserUpdatePayload } from "@/types/user";
 import type { AdminTransaction } from "@/types/transaction";
-import type { TradeAdminPendingOrder } from "@/services/tradeAdmin.service";
+import type {
+  TradeAdminClosedTrade,
+  TradeAdminPendingOrder,
+} from "@/services/tradeAdmin.service";
+import { displayTicket } from "@/utils/displayIds";
+import TradeEditModal from "@/app/admin/components/trades/TradeEditModal";
+import PresenceBadge from "@/app/admin/components/ui/PresenceBadge";
 
 const kycStyles: Record<string, string> = {
   VERIFIED: "border-emerald-500/40 bg-emerald-500/5 text-emerald-600",
@@ -183,6 +190,7 @@ const buildAccountEditForm = (account: AdminAccount): AccountEditForm => ({
 
 type LivePositionSnapshot = {
   positionId: string;
+  ticket?: number | null;
   accountId: string;
   symbol?: string;
   side?: string;
@@ -392,6 +400,7 @@ export default function UserViewPage() {
   const cancelPendingMutation = useTradeAdminCancelPendingOrder();
   const modifyPositionMutation = useTradeAdminModifyPosition();
   const closePositionMutation = useTradeAdminClosePosition();
+  const modifyClosedMutation = useTradeAdminModifyClosedTrade();
 
   const [editOpen, setEditOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
@@ -428,21 +437,16 @@ export default function UserViewPage() {
   });
   const [positionActionOpen, setPositionActionOpen] = useState(false);
   const [positionAction, setPositionAction] = useState<LivePositionSnapshot | null>(null);
-  const [positionForm, setPositionForm] = useState({
-    stopLoss: "",
-    takeProfit: "",
-  });
   const [positionActionError, setPositionActionError] = useState("");
   const [pendingActionOpen, setPendingActionOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<TradeAdminPendingOrder | null>(
     null
   );
-  const [pendingEditForm, setPendingEditForm] = useState({
-    price: "",
-    stopLoss: "",
-    takeProfit: "",
-  });
   const [pendingActionError, setPendingActionError] = useState("");
+  const [closedEditOpen, setClosedEditOpen] = useState(false);
+  const [closedEditTrade, setClosedEditTrade] =
+    useState<TradeAdminClosedTrade | null>(null);
+  const [closedEditError, setClosedEditError] = useState("");
   const [liveStatus, setLiveStatus] = useState<
     "idle" | "connecting" | "connected" | "error"
   >("idle");
@@ -558,6 +562,20 @@ export default function UserViewPage() {
     () => accountsQuery.data?.data ?? [],
     [accountsQuery.data?.data]
   );
+  const accountNumberById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const account of accountList) {
+      const id = String(account._id ?? "").trim();
+      if (!id) continue;
+      map.set(id, String(account.account_number || id));
+    }
+    return map;
+  }, [accountList]);
+  const resolveAccountLabel = (accountId?: string | null) => {
+    const id = String(accountId ?? "").trim();
+    if (!id) return "--";
+    return accountNumberById.get(id) || id;
+  };
   const selectedAccount = useMemo(() => {
     if (!selectedAccountId) return null;
     return accountList.find((account) => account._id === selectedAccountId) ?? null;
@@ -1138,8 +1156,14 @@ export default function UserViewPage() {
           }
 
           const prev = livePositionsRef.current.get(positionId);
+          const ticketRaw = data.ticket ?? data.Ticket ?? prev?.ticket;
+          const ticketNum =
+            typeof ticketRaw === "number"
+              ? ticketRaw
+              : Number(ticketRaw);
           const snapshot: LivePositionSnapshot = {
             positionId,
+            ticket: Number.isFinite(ticketNum) ? ticketNum : prev?.ticket ?? null,
             accountId: data.accountId,
             symbol: data.symbol ?? prev?.symbol,
             side: data.side ?? prev?.side,
@@ -1548,10 +1572,6 @@ export default function UserViewPage() {
 
   const openPositionAction = (position: LivePositionSnapshot) => {
     setPositionAction(position);
-    setPositionForm({
-      stopLoss: position.stopLoss ? String(position.stopLoss) : "",
-      takeProfit: position.takeProfit ? String(position.takeProfit) : "",
-    });
     setPositionActionError("");
     setPositionActionOpen(true);
   };
@@ -1564,11 +1584,6 @@ export default function UserViewPage() {
 
   const openPendingAction = (order: TradeAdminPendingOrder) => {
     setPendingAction(order);
-    setPendingEditForm({
-      price: order.price ? String(order.price) : "",
-      stopLoss: order.stopLoss ? String(order.stopLoss) : "",
-      takeProfit: order.takeProfit ? String(order.takeProfit) : "",
-    });
     setPendingActionError("");
     setPendingActionOpen(true);
   };
@@ -1579,20 +1594,36 @@ export default function UserViewPage() {
     setPendingActionError("");
   };
 
-  const handlePositionModifySubmit = (event: FormEvent) => {
-    event.preventDefault();
-    if (!positionAction) return;
+  const openClosedEdit = (trade: TradeAdminClosedTrade) => {
+    setClosedEditTrade(trade);
+    setClosedEditError("");
+    setClosedEditOpen(true);
+  };
 
-    const stopLoss = parseNullableNumber(positionForm.stopLoss);
-    const takeProfit = parseNullableNumber(positionForm.takeProfit);
+  const closeClosedEdit = () => {
+    setClosedEditOpen(false);
+    setClosedEditTrade(null);
+    setClosedEditError("");
+  };
 
+  const handlePositionModifySubmit = (payload: Record<string, unknown>) => {
     modifyPositionMutation.mutate(
       {
-        accountId: positionAction.accountId,
-        positionId: positionAction.positionId,
-        userId,
-        stopLoss: stopLoss ?? undefined,
-        takeProfit: takeProfit ?? undefined,
+        accountId: String(payload.accountId),
+        positionId: String(payload.positionId),
+        userId: String(payload.userId || userId),
+        volume:
+          typeof payload.volume === "number" ? payload.volume : undefined,
+        openPrice:
+          typeof payload.openPrice === "number" ? payload.openPrice : undefined,
+        stopLoss:
+          payload.stopLoss === undefined
+            ? undefined
+            : (payload.stopLoss as number | null),
+        takeProfit:
+          payload.takeProfit === undefined
+            ? undefined
+            : (payload.takeProfit as number | null),
       },
       {
         onSuccess: () => {
@@ -1606,26 +1637,23 @@ export default function UserViewPage() {
     );
   };
 
-  const handlePendingModifySubmit = (event: FormEvent) => {
-    event.preventDefault();
-    if (!pendingAction) return;
-
-    const price = parseNullableNumber(pendingEditForm.price);
-    const stopLoss = parseNullableNumber(pendingEditForm.stopLoss);
-    const takeProfit = parseNullableNumber(pendingEditForm.takeProfit);
-
-    if (price === null && stopLoss === null && takeProfit === null) {
-      setPendingActionError("Enter price or stopLoss/takeProfit.");
-      return;
-    }
-
+  const handlePendingModifySubmit = (payload: Record<string, unknown>) => {
     modifyPendingMutation.mutate(
       {
-        accountId: pendingAction.accountId,
-        orderId: pendingAction.orderId,
-        price: price ?? undefined,
-        stopLoss: stopLoss ?? undefined,
-        takeProfit: takeProfit ?? undefined,
+        accountId: String(payload.accountId),
+        orderId: String(payload.orderId),
+        userId: String(payload.userId || userId),
+        volume:
+          typeof payload.volume === "number" ? payload.volume : undefined,
+        price: typeof payload.price === "number" ? payload.price : undefined,
+        stopLoss:
+          payload.stopLoss === undefined
+            ? undefined
+            : (payload.stopLoss as number | null),
+        takeProfit:
+          payload.takeProfit === undefined
+            ? undefined
+            : (payload.takeProfit as number | null),
       },
       {
         onSuccess: () => {
@@ -1636,6 +1664,59 @@ export default function UserViewPage() {
         onError: (err: unknown) => {
           setPendingActionError(
             extractMessage(err) || "Pending order update failed."
+          );
+        },
+      }
+    );
+  };
+
+  const handleClosedEditSubmit = (payload: Record<string, unknown>) => {
+    modifyClosedMutation.mutate(
+      {
+        tradeId: String(payload.tradeId),
+        accountId: String(payload.accountId),
+        userId: String(payload.userId || userId),
+        volume:
+          typeof payload.volume === "number" ? payload.volume : undefined,
+        openPrice:
+          typeof payload.openPrice === "number" ? payload.openPrice : undefined,
+        closePrice:
+          typeof payload.closePrice === "number"
+            ? payload.closePrice
+            : undefined,
+        stopLoss:
+          payload.stopLoss === undefined
+            ? undefined
+            : (payload.stopLoss as number | null),
+        takeProfit:
+          payload.takeProfit === undefined
+            ? undefined
+            : (payload.takeProfit as number | null),
+        commission:
+          typeof payload.commission === "number"
+            ? payload.commission
+            : undefined,
+        spread:
+          typeof payload.spread === "number" ? payload.spread : undefined,
+        swap: typeof payload.swap === "number" ? payload.swap : undefined,
+        realizedPnL:
+          typeof payload.realizedPnL === "number"
+            ? payload.realizedPnL
+            : undefined,
+        closeReason:
+          payload.closeReason === undefined
+            ? undefined
+            : (payload.closeReason as string | null),
+      },
+      {
+        onSuccess: () => {
+          setToast("Closed trade updated.");
+          closeClosedEdit();
+          closedTradesQuery.refetch();
+        },
+        onError: (err: unknown) => {
+          setClosedEditError(
+            extractMessage(err) || "Closed trade update failed."
           );
         },
       }
@@ -1993,6 +2074,11 @@ export default function UserViewPage() {
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                <PresenceBadge
+                  online={Boolean(userQuery.data?.isOnline)}
+                  lastSeenAt={userQuery.data?.lastSeenAt ?? null}
+                  size="md"
+                />
                 <span
                   className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 uppercase tracking-wide ${mailBadgeClass}`}
                 >
@@ -2831,7 +2917,7 @@ export default function UserViewPage() {
                     <th className="px-4 py-3">Stop Loss</th>
                     <th className="px-4 py-3">Take Profit</th>
                     <th className="px-4 py-3">Floating PnL</th>
-                    <th className="px-4 py-3">Account ID</th>
+                    <th className="px-4 py-3">Account</th>
                     <th className="px-4 py-3">Position ID</th>
                     <th className="px-4 py-3">Updated</th>
                     <th className="px-4 py-3">Actions</th>
@@ -2876,10 +2962,10 @@ export default function UserViewPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 font-mono text-xs">
-                        {position.accountId}
+                        {resolveAccountLabel(position.accountId)}
                       </td>
                       <td className="px-4 py-3 font-mono text-xs">
-                        {position.positionId}
+                        {displayTicket(position)}
                       </td>
                       <td className="px-4 py-3 text-xs">
                         {formatDateTime(position.updatedAt)}
@@ -3008,8 +3094,9 @@ export default function UserViewPage() {
                       <th className="px-4 py-3">Realized PnL</th>
                       <th className="px-4 py-3">Open Time</th>
                       <th className="px-4 py-3">Close Time</th>
-                      <th className="px-4 py-3">Account ID</th>
+                      <th className="px-4 py-3">Account</th>
                       <th className="px-4 py-3">Position ID</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -3060,10 +3147,21 @@ export default function UserViewPage() {
                           {formatDateTime(trade.closeTime)}
                         </td>
                         <td className="px-4 py-3 font-mono text-xs">
-                          {trade.accountId}
+                          {trade.accountNumber ||
+                            resolveAccountLabel(trade.accountId)}
                         </td>
                         <td className="px-4 py-3 font-mono text-xs">
-                          {trade.positionId}
+                          {displayTicket(trade)}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => openClosedEdit(trade)}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] px-2.5 py-1 text-xs font-semibold hover:bg-[var(--hover-bg)]"
+                          >
+                            <Pencil size={12} />
+                            Edit
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -3175,7 +3273,7 @@ export default function UserViewPage() {
                       <th className="px-4 py-3">Take Profit</th>
                       <th className="px-4 py-3">Created</th>
                       <th className="px-4 py-3">Updated</th>
-                      <th className="px-4 py-3">Account ID</th>
+                      <th className="px-4 py-3">Account</th>
                       <th className="px-4 py-3">Order ID</th>
                       <th className="px-4 py-3">Actions</th>
                     </tr>
@@ -3249,10 +3347,11 @@ export default function UserViewPage() {
                           {formatDateTime(order.updatedAt)}
                         </td>
                         <td className="px-4 py-3 font-mono text-xs">
-                          {order.accountId}
+                          {order.accountNumber ||
+                            resolveAccountLabel(order.accountId)}
                         </td>
                         <td className="px-4 py-3 font-mono text-xs">
-                          {order.orderId}
+                          {displayTicket(order)}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap items-center gap-2">
@@ -3966,210 +4065,95 @@ export default function UserViewPage() {
         </form>
       </Modal>
 
-      <Modal
-        title="Modify Position"
+      <TradeEditModal
         open={positionActionOpen}
+        mode="live"
+        trade={
+          positionAction
+            ? {
+                accountId: positionAction.accountId,
+                userId: String(userId),
+                positionId: positionAction.positionId,
+                ticket: positionAction.ticket,
+                accountNumber: resolveAccountLabel(positionAction.accountId),
+                symbol: positionAction.symbol,
+                side: positionAction.side,
+                volume: positionAction.volume,
+                openPrice: positionAction.openPrice,
+                stopLoss: positionAction.stopLoss,
+                takeProfit: positionAction.takeProfit,
+              }
+            : null
+        }
+        saving={modifyPositionMutation.isPending}
+        error={positionActionError}
         onClose={closePositionAction}
-        size="sm"
-        footer={
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={closePositionAction}
-              className="rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] px-4 py-2 text-sm font-semibold hover:bg-[var(--hover-bg)]"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              form="position-action-form"
-              disabled={modifyPositionMutation.isPending || !positionAction}
-              className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--primary-dark)] disabled:opacity-60"
-            >
-              {modifyPositionMutation.isPending ? "Saving..." : "Save Changes"}
-            </button>
-          </div>
-        }
-      >
-        <form
-          id="position-action-form"
-          onSubmit={handlePositionModifySubmit}
-          className="space-y-4"
-        >
-          {positionActionError ? (
-            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
-              {positionActionError}
-            </div>
-          ) : null}
+        onSubmit={handlePositionModifySubmit}
+      />
 
-          {!positionAction ? (
-            <p className="text-sm text-[var(--text-muted)]">No position selected.</p>
-          ) : (
-            <>
-              <div className="rounded-lg border border-[var(--card-border)] bg-[var(--input-bg)] p-3 text-sm">
-                <p className="font-mono font-semibold">{positionAction.positionId}</p>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  Account: {positionAction.accountId}
-                </p>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="text-xs font-medium text-[var(--text-muted)]">
-                    Stop Loss
-                  </label>
-                  <FieldControl icon={Hash}>
-                    <input
-                      type="number"
-                      step="0.0001"
-                      value={positionForm.stopLoss}
-                      onChange={(event) =>
-                        setPositionForm((prev) => ({
-                          ...prev,
-                          stopLoss: event.target.value,
-                        }))
-                      }
-                      className="w-full bg-transparent text-sm text-[var(--text-main)] outline-none"
-                    />
-                  </FieldControl>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-[var(--text-muted)]">
-                    Take Profit
-                  </label>
-                  <FieldControl icon={Hash}>
-                    <input
-                      type="number"
-                      step="0.0001"
-                      value={positionForm.takeProfit}
-                      onChange={(event) =>
-                        setPositionForm((prev) => ({
-                          ...prev,
-                          takeProfit: event.target.value,
-                        }))
-                      }
-                      className="w-full bg-transparent text-sm text-[var(--text-main)] outline-none"
-                    />
-                  </FieldControl>
-                </div>
-              </div>
-            </>
-          )}
-        </form>
-      </Modal>
-
-      <Modal
-        title="Modify Pending Order"
+      <TradeEditModal
         open={pendingActionOpen}
-        onClose={closePendingAction}
-        size="sm"
-        footer={
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={closePendingAction}
-              className="rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] px-4 py-2 text-sm font-semibold hover:bg-[var(--hover-bg)]"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              form="pending-action-form"
-              disabled={modifyPendingMutation.isPending || !pendingAction}
-              className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--primary-dark)] disabled:opacity-60"
-            >
-              {modifyPendingMutation.isPending ? "Saving..." : "Save Changes"}
-            </button>
-          </div>
+        mode="pending"
+        trade={
+          pendingAction
+            ? {
+                accountId: pendingAction.accountId,
+                userId: pendingAction.userId || String(userId),
+                orderId: pendingAction.orderId,
+                ticket: pendingAction.ticket,
+                accountNumber:
+                  pendingAction.accountNumber ||
+                  resolveAccountLabel(pendingAction.accountId),
+                symbol: pendingAction.symbol,
+                side: String(pendingAction.side),
+                volume: pendingAction.volume,
+                price: pendingAction.price,
+                stopLoss: pendingAction.stopLoss,
+                takeProfit: pendingAction.takeProfit,
+              }
+            : null
         }
-      >
-        <form
-          id="pending-action-form"
-          onSubmit={handlePendingModifySubmit}
-          className="space-y-4"
-        >
-          {pendingActionError ? (
-            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
-              {pendingActionError}
-            </div>
-          ) : null}
+        saving={modifyPendingMutation.isPending}
+        error={pendingActionError}
+        onClose={closePendingAction}
+        onSubmit={handlePendingModifySubmit}
+      />
 
-          {!pendingAction ? (
-            <p className="text-sm text-[var(--text-muted)]">
-              No pending order selected.
-            </p>
-          ) : (
-            <>
-              <div className="rounded-lg border border-[var(--card-border)] bg-[var(--input-bg)] p-3 text-sm">
-                <p className="font-mono font-semibold">{pendingAction.orderId}</p>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  Account: {pendingAction.accountId}
-                </p>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="text-xs font-medium text-[var(--text-muted)]">
-                    Price
-                  </label>
-                  <FieldControl icon={Hash}>
-                    <input
-                      type="number"
-                      step="0.0001"
-                      value={pendingEditForm.price}
-                      onChange={(event) =>
-                        setPendingEditForm((prev) => ({
-                          ...prev,
-                          price: event.target.value,
-                        }))
-                      }
-                      className="w-full bg-transparent text-sm text-[var(--text-main)] outline-none"
-                    />
-                  </FieldControl>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-[var(--text-muted)]">
-                    Stop Loss
-                  </label>
-                  <FieldControl icon={Hash}>
-                    <input
-                      type="number"
-                      step="0.0001"
-                      value={pendingEditForm.stopLoss}
-                      onChange={(event) =>
-                        setPendingEditForm((prev) => ({
-                          ...prev,
-                          stopLoss: event.target.value,
-                        }))
-                      }
-                      className="w-full bg-transparent text-sm text-[var(--text-main)] outline-none"
-                    />
-                  </FieldControl>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-[var(--text-muted)]">
-                    Take Profit
-                  </label>
-                  <FieldControl icon={Hash}>
-                    <input
-                      type="number"
-                      step="0.0001"
-                      value={pendingEditForm.takeProfit}
-                      onChange={(event) =>
-                        setPendingEditForm((prev) => ({
-                          ...prev,
-                          takeProfit: event.target.value,
-                        }))
-                      }
-                      className="w-full bg-transparent text-sm text-[var(--text-main)] outline-none"
-                    />
-                  </FieldControl>
-                </div>
-              </div>
-            </>
-          )}
-        </form>
-      </Modal>
+      <TradeEditModal
+        open={closedEditOpen}
+        mode="closed"
+        trade={
+          closedEditTrade
+            ? {
+                accountId: closedEditTrade.accountId,
+                userId: closedEditTrade.userId || String(userId),
+                tradeId: closedEditTrade._id,
+                positionId: closedEditTrade.positionId,
+                ticket: closedEditTrade.ticket,
+                accountNumber:
+                  closedEditTrade.accountNumber ||
+                  resolveAccountLabel(closedEditTrade.accountId),
+                symbol: closedEditTrade.symbol,
+                side: String(closedEditTrade.side),
+                volume: closedEditTrade.volume,
+                openPrice: closedEditTrade.openPrice,
+                closePrice: closedEditTrade.closePrice,
+                contractSize: closedEditTrade.contractSize,
+                stopLoss: closedEditTrade.stopLoss,
+                takeProfit: closedEditTrade.takeProfit,
+                commission: closedEditTrade.commission,
+                spread: closedEditTrade.spread,
+                swap: closedEditTrade.swap,
+                realizedPnL: closedEditTrade.realizedPnL,
+                closeReason: closedEditTrade.closeReason,
+              }
+            : null
+        }
+        saving={modifyClosedMutation.isPending}
+        error={closedEditError}
+        onClose={closeClosedEdit}
+        onSubmit={handleClosedEditSubmit}
+      />
 
       <Modal
         title="Delete Account"

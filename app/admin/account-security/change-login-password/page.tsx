@@ -10,16 +10,24 @@ import { Toast } from "@/app/admin/components/ui/Toast";
 type AdminIdentity = {
   _id?: string;
   id?: string;
+  email?: string;
+  name?: string;
   user?: {
     _id?: string;
     id?: string;
+    email?: string;
+    name?: string;
   };
   data?: {
     _id?: string;
     id?: string;
+    email?: string;
+    name?: string;
     user?: {
       _id?: string;
       id?: string;
+      email?: string;
+      name?: string;
     };
   };
 };
@@ -39,6 +47,20 @@ function resolveAdminId(payload?: AdminIdentity): string {
   return candidates.find((value) => typeof value === "string" && value.trim()) || "";
 }
 
+function resolveAdminLabel(payload?: AdminIdentity): string {
+  const candidates = [
+    payload?.email,
+    payload?.name,
+    payload?.user?.email,
+    payload?.user?.name,
+    payload?.data?.email,
+    payload?.data?.name,
+    payload?.data?.user?.email,
+    payload?.data?.user?.name,
+  ];
+  return candidates.find((value) => typeof value === "string" && value.trim()) || "";
+}
+
 export default function ChangeLoginPasswordPage() {
   const { data: me, isLoading: meLoading } = useAdminMe();
   const changePasswordMutation = useChangeAdminUserPassword();
@@ -51,6 +73,10 @@ export default function ChangeLoginPasswordPage() {
   const [toast, setToast] = useState("");
 
   const adminId = useMemo(() => resolveAdminId(me as AdminIdentity | undefined), [me]);
+  const adminLabel = useMemo(
+    () => resolveAdminLabel(me as AdminIdentity | undefined),
+    [me]
+  );
 
   useEffect(() => {
     if (!toast) return;
@@ -130,8 +156,10 @@ export default function ChangeLoginPasswordPage() {
       ) : (
         <div className="card-elevated space-y-5">
           <div className="rounded-lg border border-[var(--card-border)] bg-[var(--input-bg)] px-4 py-3 text-xs text-[var(--text-muted)]">
-            Admin ID:{" "}
-            <span className="font-mono text-[var(--foreground)]">{adminId || "--"}</span>
+            Signed in as:{" "}
+            <span className="font-semibold text-[var(--foreground)]">
+              {adminLabel || "--"}
+            </span>
           </div>
 
           {error && (

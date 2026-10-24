@@ -354,10 +354,24 @@ export default function MarketWatch() {
         const live = liveQuotes[row.code];
         const precision = precisionMap[row.code] ?? 2;
 
-        const bid = splitPrice(live?.bid ?? "--", precision);
-        const ask = splitPrice(live?.ask ?? "--", precision);
-        const spread = calcSpread(live?.bid, live?.ask);
-        const current = toNumber(live?.bid ?? live?.ask);
+        const lastPrice =
+          live?.bid && live.bid !== "--"
+            ? live.bid
+            : live?.ask && live.ask !== "--"
+              ? live.ask
+              : live?.close ?? live?.open ?? "--";
+        const displayBid =
+          live?.bid && live.bid !== "--" ? live.bid : lastPrice;
+        const displayAsk =
+          live?.ask && live.ask !== "--" ? live.ask : lastPrice;
+
+        const bid = splitPrice(displayBid ?? "--", precision);
+        const ask = splitPrice(displayAsk ?? "--", precision);
+        const spread = calcSpread(
+          live?.bid && live.bid !== "--" ? live.bid : undefined,
+          live?.ask && live.ask !== "--" ? live.ask : undefined
+        );
+        const current = toNumber(displayBid ?? displayAsk);
         const open = toNumber(live?.open);
         const delta =
           typeof live?.change === "number"

@@ -6,8 +6,10 @@ export const useAdminUser = (userId?: string) =>
     queryKey: ["admin-user", userId],
     queryFn: () => fetchAdminUserById(userId as string),
     enabled: Boolean(userId),
-    staleTime: 1000 * 30,
-    refetchOnWindowFocus: false,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: true,
     retry: (failureCount, error: unknown) => {
       const status =
         typeof error === "object" && error !== null

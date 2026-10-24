@@ -13,6 +13,10 @@ import Pagination from "@/app/admin/components/ui/pagination";
 import DragScroll from "@/app/admin/components/ui/DragScroll";
 import { useTradeAdminBrokerage } from "@/hooks/useTradeAdminBrokerage";
 import type { TradeAdminBrokerageItem } from "@/services/tradeAdmin.service";
+import {
+  displayAccountLabel,
+  displayUserLabel,
+} from "@/utils/displayIds";
 
 function getDefaultFromDate() {
   const date = new Date();
@@ -235,8 +239,8 @@ export default function BrokerageCommissionPage() {
                 <thead className="bg-[var(--input-bg)] text-xs uppercase text-[var(--text-muted)]">
                   <tr>
                     <th className="px-4 py-3">Symbol</th>
-                    <th className="px-4 py-3">User ID</th>
-                    <th className="px-4 py-3">Account ID</th>
+                    <th className="px-4 py-3">User</th>
+                    <th className="px-4 py-3">Account</th>
                     <th className="px-4 py-3">Spread</th>
                     <th className="px-4 py-3">Commission</th>
                     <th className="px-4 py-3">Swap</th>
@@ -255,8 +259,19 @@ export default function BrokerageCommissionPage() {
                       }}
                     >
                       <td className="px-4 py-3 font-semibold">{item.symbol || "--"}</td>
-                      <td className="px-4 py-3 font-mono text-xs">{item.user_id}</td>
-                      <td className="px-4 py-3 font-mono text-xs">{item.account_id}</td>
+                      <td className="px-4 py-3 text-xs">
+                        {displayUserLabel({
+                          userId: item.user_id,
+                          userName: item.userName || item.user_name,
+                          userEmail: item.userEmail || item.user_email,
+                        })}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs">
+                        {displayAccountLabel({
+                          accountId: item.account_id,
+                          accountNumber: item.accountNumber || item.account_number,
+                        })}
+                      </td>
                       <td className="px-4 py-3">{formatNumber(item.spread, 4)}</td>
                       <td className="px-4 py-3">{formatNumber(item.commission, 4)}</td>
                       <td className="px-4 py-3">{formatNumber(item.swap, 4)}</td>
@@ -343,10 +358,19 @@ function MobileRowCard({ item }: { item: TradeAdminBrokerageItem }) {
       </div>
 
       <p className="mt-2 truncate text-[11px] text-[var(--text-muted)]">
-        User: {item.user_id}
+        User:{" "}
+        {displayUserLabel({
+          userId: item.user_id,
+          userName: item.userName || item.user_name,
+          userEmail: item.userEmail || item.user_email,
+        })}
       </p>
       <p className="truncate text-[11px] text-[var(--text-muted)]">
-        Account: {item.account_id}
+        Account:{" "}
+        {displayAccountLabel({
+          accountId: item.account_id,
+          accountNumber: item.accountNumber || item.account_number,
+        })}
       </p>
     </div>
   );

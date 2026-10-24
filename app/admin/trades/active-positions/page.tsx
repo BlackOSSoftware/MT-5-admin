@@ -22,6 +22,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
+  Trash2,
   User,
   Wallet,
   XCircle,
@@ -35,6 +36,7 @@ import { useLiveQuotesBySymbols } from "@/hooks/useLiveQuotesBySymbols";
 import { useTradeAdminOpenTrades } from "@/hooks/useTradeAdminOpenTrades";
 import {
   useTradeAdminClosePosition,
+  useTradeAdminDeleteTrade,
   useTradeAdminModifyPosition,
 } from "@/hooks/useTradeAdminOrderActions";
 import { getAccessTokenFromCookie } from "@/services/marketSocket.service";
@@ -45,6 +47,12 @@ import type {
   TradeSide,
   TradeSortDir,
 } from "@/services/tradeAdmin.service";
+import {
+  displayAccountLabel,
+  displayTicket,
+  displayUserLabel,
+} from "@/utils/displayIds";
+import TradeEditModal from "@/app/admin/components/trades/TradeEditModal";
 
 type OpenTradeFilters = {
   userId: string;
@@ -206,10 +214,6 @@ export default function ActivePositionsPage() {
     null
   );
   const [positionActionError, setPositionActionError] = useState("");
-  const [positionForm, setPositionForm] = useState({
-    stopLoss: "",
-    takeProfit: "",
-  });
 
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
   const [closeTarget, setCloseTarget] = useState<TradeAdminOpenTrade | null>(null);
@@ -233,6 +237,7 @@ export default function ActivePositionsPage() {
   });
 
   const modifyPositionMutation = useTradeAdminModifyPosition();
+  const deleteTradeMutation = useTradeAdminDeleteTrade();
   const closePositionMutation = useTradeAdminClosePosition();
 
   const rows = useMemo(
@@ -347,16 +352,6 @@ export default function ActivePositionsPage() {
 
   const openPositionAction = (trade: TradeAdminOpenTrade) => {
     setPositionAction(trade);
-    setPositionForm({
-      stopLoss:
-        trade.stopLoss === null || trade.stopLoss === undefined
-          ? ""
-          : String(trade.stopLoss),
-      takeProfit:
-        trade.takeProfit === null || trade.takeProfit === undefined
-          ? ""
-          : String(trade.takeProfit),
-    });
     setPositionActionError("");
     setPositionActionOpen(true);
   };
@@ -367,25 +362,54 @@ export default function ActivePositionsPage() {
     setPositionActionError("");
   };
 
-  const handlePositionModifySubmit = (event: FormEvent) => {
-    event.preventDefault();
-    if (!positionAction) return;
+  const handleDeleteLive = (trade: TradeAdminOpenTrade) => {
+    if (!window.confirm(`Delete live position ${displayTicket(trade)}?`)) return;
+    deleteTradeMutation.mutate(
+      {
+        kind: "LIVE",
+        accountId: trade.accountId,
+        userId: trade.userId,
+        positionId: trade.positionId,
+        tradeId: trade._id,
+      },
+      {
+        onSuccess: () => {
+          setCopyToast("Live position deleted.");
+          setTimeout(() => setCopyToast(""), 1800);
+          openTradesQuery.refetch();
+        },
+        onError: (err: unknown) => {
+          const msg =
+            typeof err === "object" && err !== null
+              ? ((err as { response?: { data?: { message?: string } } }).response
+                  ?.data?.message ??
+                (err as { message?: string }).message)
+              : undefined;
+          setCopyToast(msg || "Delete failed.");
+          setTimeout(() => setCopyToast(""), 2200);
+        },
+      }
+    );
+  };
 
-    const stopLoss = parseNullableNumber(positionForm.stopLoss);
-    const takeProfit = parseNullableNumber(positionForm.takeProfit);
-
-    if (stopLoss === null && takeProfit === null) {
-      setPositionActionError("Enter stop loss or take profit.");
-      return;
-    }
-
+  const handlePositionModifySubmit = (payload: Record<string, unknown>) => {
     modifyPositionMutation.mutate(
       {
-        accountId: positionAction.accountId,
-        positionId: positionAction.positionId,
-        userId: positionAction.userId,
-        stopLoss: stopLoss ?? undefined,
-        takeProfit: takeProfit ?? undefined,
+        accountId: String(payload.accountId),
+        positionId: String(payload.positionId),
+        userId: String(payload.userId),
+        volume:
+          typeof payload.volume === "number" ? payload.volume : undefined,
+        openPrice:
+          typeof payload.openPrice === "number" ? payload.openPrice : undefined,
+        stopLoss:
+          payload.stopLoss === undefined
+            ? undefined
+            : (payload.stopLoss as number | null),
+        takeProfit:
+          payload.takeProfit === undefined
+            ? undefined
+            : (payload.takeProfit as number | null),
       },
       {
         onSuccess: () => {
@@ -761,12 +785,12 @@ export default function ActivePositionsPage() {
                     </th>
                     <th className="px-4 py-3">
                       <span className="inline-flex items-center gap-1">
-                        <User size={12} /> User ID
+                        <User size={12} /> User
                       </span>
                     </th>
                     <th className="px-4 py-3">
                       <span className="inline-flex items-center gap-1">
-                        <Wallet size={12} /> Account ID
+                        <Wallet size={12} /> Account
                       </span>
                     </th>
                     <th className="px-4 py-3">
@@ -829,30 +853,38 @@ export default function ActivePositionsPage() {
                         <td className="whitespace-nowrap px-4 py-3 text-xs">
                           {formatDateTime(trade.openTime)}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
+                        <td className="whitespace-nowrap px-4 py-3 text-xs">
                           <div className="inline-flex items-center gap-1.5">
-                            {trade.userId}
-                            <CopyBtn
-                              onClick={() => handleCopy(trade.userId, "User ID")}
-                            />
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
-                          <div className="inline-flex items-center gap-1.5">
-                            {trade.accountId}
+                            {displayUserLabel(trade)}
                             <CopyBtn
                               onClick={() =>
-                                handleCopy(trade.accountId, "Account ID")
+                                handleCopy(
+                                  trade.userEmail || trade.userId,
+                                  "User"
+                                )
                               }
                             />
                           </div>
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
                           <div className="inline-flex items-center gap-1.5">
-                            {trade.positionId}
+                            {displayAccountLabel(trade)}
                             <CopyBtn
                               onClick={() =>
-                                handleCopy(trade.positionId, "Position ID")
+                                handleCopy(
+                                  trade.accountNumber || trade.accountId,
+                                  "Account"
+                                )
+                              }
+                            />
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
+                          <div className="inline-flex items-center gap-1.5">
+                            {displayTicket(trade)}
+                            <CopyBtn
+                              onClick={() =>
+                                handleCopy(displayTicket(trade), "Position ID")
                               }
                             />
                           </div>
@@ -890,6 +922,17 @@ export default function ActivePositionsPage() {
                             >
                               <XCircle size={12} />
                               Close
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteLive(trade);
+                              }}
+                              className="inline-flex items-center gap-1 rounded-md border border-rose-500/40 bg-rose-500/10 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-500/20"
+                            >
+                              <Trash2 size={12} />
+                              Delete
                             </button>
                           </div>
                         </td>
@@ -939,101 +982,31 @@ export default function ActivePositionsPage() {
         </div>
       ) : null}
 
-      <Modal
-        title="Modify Position"
+      <TradeEditModal
         open={positionActionOpen}
-        onClose={closePositionAction}
-        size="sm"
-        footer={
-          <div className="flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={closePositionAction}
-              className="rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] px-4 py-2 text-sm font-semibold hover:bg-[var(--hover-bg)]"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              form="position-action-form"
-              disabled={modifyPositionMutation.isPending || !positionAction}
-              className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--primary-dark)] disabled:opacity-60"
-            >
-              {modifyPositionMutation.isPending ? "Saving..." : "Save Changes"}
-            </button>
-          </div>
+        mode="live"
+        trade={
+          positionAction
+            ? {
+                accountId: positionAction.accountId,
+                userId: positionAction.userId,
+                positionId: positionAction.positionId,
+                ticket: positionAction.ticket,
+                accountNumber: positionAction.accountNumber,
+                symbol: positionAction.symbol,
+                side: String(positionAction.side),
+                volume: positionAction.volume,
+                openPrice: positionAction.openPrice,
+                stopLoss: positionAction.stopLoss,
+                takeProfit: positionAction.takeProfit,
+              }
+            : null
         }
-      >
-        <form
-          id="position-action-form"
-          onSubmit={handlePositionModifySubmit}
-          className="space-y-4"
-        >
-          {positionActionError ? (
-            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
-              {positionActionError}
-            </div>
-          ) : null}
-
-          {!positionAction ? (
-            <p className="text-sm text-[var(--text-muted)]">
-              No position selected.
-            </p>
-          ) : (
-            <>
-              <div className="rounded-lg border border-[var(--card-border)] bg-[var(--input-bg)] p-3 text-sm">
-                <p className="font-mono font-semibold">
-                  {positionAction.positionId}
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  Account: {positionAction.accountId}
-                </p>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="text-xs font-medium text-[var(--text-muted)]">
-                    Stop Loss
-                  </label>
-                  <FieldControl icon={Hash}>
-                    <input
-                      type="number"
-                      step="0.0001"
-                      value={positionForm.stopLoss}
-                      onChange={(event) =>
-                        setPositionForm((prev) => ({
-                          ...prev,
-                          stopLoss: event.target.value,
-                        }))
-                      }
-                      className="w-full bg-transparent text-sm text-[var(--text-main)] outline-none"
-                    />
-                  </FieldControl>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-[var(--text-muted)]">
-                    Take Profit
-                  </label>
-                  <FieldControl icon={Hash}>
-                    <input
-                      type="number"
-                      step="0.0001"
-                      value={positionForm.takeProfit}
-                      onChange={(event) =>
-                        setPositionForm((prev) => ({
-                          ...prev,
-                          takeProfit: event.target.value,
-                        }))
-                      }
-                      className="w-full bg-transparent text-sm text-[var(--text-main)] outline-none"
-                    />
-                  </FieldControl>
-                </div>
-              </div>
-            </>
-          )}
-        </form>
-      </Modal>
+        saving={modifyPositionMutation.isPending}
+        error={positionActionError}
+        onClose={closePositionAction}
+        onSubmit={handlePositionModifySubmit}
+      />
       <Modal
         title="Close Position"
         open={closeConfirmOpen}
@@ -1076,10 +1049,10 @@ export default function ActivePositionsPage() {
                   {closeTarget.symbol} · {closeTarget.side}
                 </p>
                 <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  Position: {closeTarget.positionId}
+                  Position ID: {displayTicket(closeTarget)}
                 </p>
                 <p className="text-xs text-[var(--text-muted)]">
-                  Account: {closeTarget.accountId}
+                  Account: {displayAccountLabel(closeTarget)}
                 </p>
               </div>
               <p className="text-sm text-[var(--text-muted)]">
@@ -1307,16 +1280,28 @@ function MobileTradeCard({
       </div>
 
       <p className="mt-2 flex items-start gap-1 text-[11px] text-[var(--text-muted)]">
-        <span className="break-all">User: {trade.userId}</span>
-        <CopyBtn onClick={() => onCopy(trade.userId, "User ID")} />
+        <span className="break-all">User: {displayUserLabel(trade)}</span>
+        <CopyBtn
+          onClick={() => onCopy(trade.userEmail || trade.userId, "User")}
+        />
       </p>
       <p className="flex items-start gap-1 text-[11px] text-[var(--text-muted)]">
-        <span className="break-all">Account: {trade.accountId}</span>
-        <CopyBtn onClick={() => onCopy(trade.accountId, "Account ID")} />
+        <span className="break-all">
+          Account: {displayAccountLabel(trade)}
+        </span>
+        <CopyBtn
+          onClick={() =>
+            onCopy(trade.accountNumber || trade.accountId, "Account")
+          }
+        />
       </p>
       <p className="flex items-start gap-1 text-[11px] text-[var(--text-muted)]">
-        <span className="break-all">Position: {trade.positionId}</span>
-        <CopyBtn onClick={() => onCopy(trade.positionId, "Position ID")} />
+        <span className="break-all">
+          Position ID: {displayTicket(trade)}
+        </span>
+        <CopyBtn
+          onClick={() => onCopy(displayTicket(trade), "Position ID")}
+        />
       </p>
       <p className="mt-1 text-[11px] text-[var(--text-muted)]">
         <span className="inline-flex items-center gap-1">

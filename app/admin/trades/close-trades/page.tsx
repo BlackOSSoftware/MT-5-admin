@@ -11,17 +11,22 @@ import {
   Copy,
   DollarSign,
   Hash,
+  Pencil,
   Search,
+  Trash2,
   SlidersHorizontal,
   Sparkles,
   User,
   Wallet,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import GlobalLoader from "@/app/admin/components/ui/GlobalLoader";
 import Pagination from "@/app/admin/components/ui/pagination";
 import DragScroll from "@/app/admin/components/ui/DragScroll";
 import { useTradeAdminClosedTrades } from "@/hooks/useTradeAdminClosedTrades";
+import {
+  useTradeAdminDeleteTrade,
+  useTradeAdminModifyClosedTrade,
+} from "@/hooks/useTradeAdminOrderActions";
 import type {
   TradeAdminClosedTrade,
   TradeOrderKind,
@@ -30,6 +35,12 @@ import type {
   TradeSortDir,
   TradeTimeField,
 } from "@/services/tradeAdmin.service";
+import {
+  displayAccountLabel,
+  displayTicket,
+  displayUserLabel,
+} from "@/utils/displayIds";
+import TradeEditModal from "@/app/admin/components/trades/TradeEditModal";
 
 type ClosedTradeFilters = {
   userId: string;
@@ -168,7 +179,6 @@ function getOrderTypeClass(orderType?: string) {
 }
 
 export default function ClosedTradesPage() {
-  const router = useRouter();
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [copyToast, setCopyToast] = useState("");
@@ -178,6 +188,11 @@ export default function ClosedTradesPage() {
     getDefaultFilters
   );
   const [filters, setFilters] = useState<ClosedTradeFilters>(getDefaultFilters);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTrade, setEditTrade] = useState<TradeAdminClosedTrade | null>(null);
+  const [editError, setEditError] = useState("");
+  const modifyClosedMutation = useTradeAdminModifyClosedTrade();
+  const deleteTradeMutation = useTradeAdminDeleteTrade();
 
   const closedTradesQuery = useTradeAdminClosedTrades({
     page,
@@ -247,6 +262,102 @@ export default function ClosedTradesPage() {
       setCopyToast("Copy failed");
       setTimeout(() => setCopyToast(""), 1800);
     }
+  };
+
+  const closeEdit = () => {
+    setEditOpen(false);
+    setEditTrade(null);
+    setEditError("");
+  };
+
+  const handleDeleteClosed = (trade: TradeAdminClosedTrade) => {
+    if (!window.confirm(`Delete closed trade ${displayTicket(trade)}?`)) {
+      return;
+    }
+    deleteTradeMutation.mutate(
+      {
+        kind: "CLOSED",
+        accountId: trade.accountId,
+        userId: trade.userId,
+        tradeId: trade._id,
+        positionId: trade.positionId,
+      },
+      {
+        onSuccess: () => {
+          setCopyToast("Closed trade deleted.");
+          setTimeout(() => setCopyToast(""), 2000);
+          closedTradesQuery.refetch();
+        },
+        onError: (err: unknown) => {
+          const msg =
+            typeof err === "object" && err !== null
+              ? ((err as { response?: { data?: { message?: string } } }).response
+                  ?.data?.message ??
+                (err as { message?: string }).message)
+              : undefined;
+          setCopyToast(msg || "Delete failed.");
+          setTimeout(() => setCopyToast(""), 2200);
+        },
+      }
+    );
+  };
+
+  const handleClosedEditSubmit = (payload: Record<string, unknown>) => {
+    modifyClosedMutation.mutate(
+      {
+        tradeId: String(payload.tradeId),
+        accountId: String(payload.accountId),
+        userId: String(payload.userId),
+        volume:
+          typeof payload.volume === "number" ? payload.volume : undefined,
+        openPrice:
+          typeof payload.openPrice === "number" ? payload.openPrice : undefined,
+        closePrice:
+          typeof payload.closePrice === "number"
+            ? payload.closePrice
+            : undefined,
+        stopLoss:
+          payload.stopLoss === undefined
+            ? undefined
+            : (payload.stopLoss as number | null),
+        takeProfit:
+          payload.takeProfit === undefined
+            ? undefined
+            : (payload.takeProfit as number | null),
+        commission:
+          typeof payload.commission === "number"
+            ? payload.commission
+            : undefined,
+        spread:
+          typeof payload.spread === "number" ? payload.spread : undefined,
+        swap: typeof payload.swap === "number" ? payload.swap : undefined,
+        realizedPnL:
+          typeof payload.realizedPnL === "number"
+            ? payload.realizedPnL
+            : undefined,
+        closeReason:
+          payload.closeReason === undefined
+            ? undefined
+            : (payload.closeReason as string | null),
+      },
+      {
+        onSuccess: () => {
+          setCopyToast("Closed trade updated.");
+          setTimeout(() => setCopyToast(""), 1800);
+          closeEdit();
+          closedTradesQuery.refetch();
+        },
+        onError: (err: unknown) => {
+          const msg =
+            typeof err === "object" && err !== null
+              ? ((err as { response?: { data?: { message?: string } } }).response
+                  ?.data?.message ??
+                (err as { message?: string }).message)
+              : undefined;
+          setEditError(msg || "Closed trade update failed.");
+        },
+      }
+    );
   };
 
   return (
@@ -573,12 +684,12 @@ export default function ClosedTradesPage() {
                     </th>
                     <th className="px-4 py-3">
                       <span className="inline-flex items-center gap-1">
-                        <User size={12} /> User ID
+                        <User size={12} /> User
                       </span>
                     </th>
                     <th className="px-4 py-3">
                       <span className="inline-flex items-center gap-1">
-                        <Wallet size={12} /> Account ID
+                        <Wallet size={12} /> Account
                       </span>
                     </th>
                     <th className="px-4 py-3">
@@ -586,17 +697,14 @@ export default function ClosedTradesPage() {
                         <Hash size={12} /> Position ID
                       </span>
                     </th>
+                    <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((trade) => (
                     <tr
                       key={trade._id}
-                      className="border-t border-[var(--card-border)] hover:bg-[var(--hover-bg)]/60 cursor-pointer"
-                      onClick={() => {
-                        if (!trade.userId) return;
-                        router.push(`/admin/users/users/view/${trade.userId}`);
-                      }}
+                      className="border-t border-[var(--card-border)] hover:bg-[var(--hover-bg)]/60"
                     >
                       <td className="whitespace-nowrap px-4 py-3 font-semibold">{trade.symbol || "--"}</td>
                       <td className="px-4 py-3">
@@ -629,28 +737,64 @@ export default function ClosedTradesPage() {
                       <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-sky-700">
                         {formatTradeDuration(trade.openTime, trade.closeTime)}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
+                      <td className="whitespace-nowrap px-4 py-3 text-xs">
                         <div className="inline-flex items-center gap-1.5">
-                          {trade.userId}
+                          {displayUserLabel(trade)}
                           <CopyBtn
-                            onClick={() => handleCopy(trade.userId, "User ID")}
+                            onClick={() =>
+                              handleCopy(
+                                trade.userEmail || trade.userId,
+                                "User"
+                              )
+                            }
                           />
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
                         <div className="inline-flex items-center gap-1.5">
-                          {trade.accountId}
+                          {displayAccountLabel(trade)}
                           <CopyBtn
-                            onClick={() => handleCopy(trade.accountId, "Account ID")}
+                            onClick={() =>
+                              handleCopy(
+                                trade.accountNumber || trade.accountId,
+                                "Account"
+                              )
+                            }
                           />
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs">
                         <div className="inline-flex items-center gap-1.5">
-                          {trade.positionId}
+                          {displayTicket(trade)}
                           <CopyBtn
-                            onClick={() => handleCopy(trade.positionId, "Position ID")}
+                            onClick={() =>
+                              handleCopy(displayTicket(trade), "Position ID")
+                            }
                           />
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right">
+                        <div className="inline-flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditTrade(trade);
+                              setEditError("");
+                              setEditOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] px-2.5 py-1 text-xs font-semibold hover:bg-[var(--hover-bg)]"
+                          >
+                            <Pencil size={12} />
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteClosed(trade)}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-rose-500/40 bg-rose-500/10 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-500/20"
+                          >
+                            <Trash2 size={12} />
+                            Delete
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -665,6 +809,11 @@ export default function ClosedTradesPage() {
                   key={`mobile-${trade._id}`}
                   trade={trade}
                   onCopy={handleCopy}
+                  onEdit={() => {
+                    setEditTrade(trade);
+                    setEditError("");
+                    setEditOpen(true);
+                  }}
                 />
               ))}
             </div>
@@ -688,6 +837,40 @@ export default function ClosedTradesPage() {
           {copyToast}
         </div>
       ) : null}
+
+      <TradeEditModal
+        open={editOpen}
+        mode="closed"
+        trade={
+          editTrade
+            ? {
+                accountId: editTrade.accountId,
+                userId: editTrade.userId,
+                tradeId: editTrade._id,
+                positionId: editTrade.positionId,
+                ticket: editTrade.ticket,
+                accountNumber: editTrade.accountNumber,
+                symbol: editTrade.symbol,
+                side: String(editTrade.side),
+                volume: editTrade.volume,
+                openPrice: editTrade.openPrice,
+                closePrice: editTrade.closePrice,
+                contractSize: editTrade.contractSize,
+                stopLoss: editTrade.stopLoss,
+                takeProfit: editTrade.takeProfit,
+                commission: editTrade.commission,
+                spread: editTrade.spread,
+                swap: editTrade.swap,
+                realizedPnL: editTrade.realizedPnL,
+                closeReason: editTrade.closeReason,
+              }
+            : null
+        }
+        saving={modifyClosedMutation.isPending}
+        error={editError}
+        onClose={closeEdit}
+        onSubmit={handleClosedEditSubmit}
+      />
     </div>
   );
 }
@@ -803,9 +986,11 @@ function MetricCard({
 function MobileTradeCard({
   trade,
   onCopy,
+  onEdit,
 }: {
   trade: TradeAdminClosedTrade;
   onCopy: (value: string, label: string) => void;
+  onEdit: () => void;
 }) {
   return (
     <div className="rounded-xl border border-[var(--card-border)] bg-gradient-to-br from-[var(--input-bg)] via-[var(--input-bg)] to-sky-500/[0.04] p-3">
@@ -814,7 +999,17 @@ function MobileTradeCard({
           <BarChart3 size={14} className="text-sky-600" />
           {trade.symbol || "--"}
         </p>
-        <SideBadge side={trade.side} />
+        <div className="flex items-center gap-2">
+          <SideBadge side={trade.side} />
+          <button
+            type="button"
+            onClick={onEdit}
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] px-2 py-1 text-[10px] font-semibold hover:bg-[var(--hover-bg)]"
+          >
+            <Pencil size={11} />
+            Edit
+          </button>
+        </div>
       </div>
 
       <div className="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
@@ -838,16 +1033,28 @@ function MobileTradeCard({
       </div>
 
       <p className="mt-2 flex items-start gap-1 text-[11px] text-[var(--text-muted)]">
-        <span className="break-all">User: {trade.userId}</span>
-        <CopyBtn onClick={() => onCopy(trade.userId, "User ID")} />
+        <span className="break-all">User: {displayUserLabel(trade)}</span>
+        <CopyBtn
+          onClick={() => onCopy(trade.userEmail || trade.userId, "User")}
+        />
       </p>
       <p className="flex items-start gap-1 text-[11px] text-[var(--text-muted)]">
-        <span className="break-all">Account: {trade.accountId}</span>
-        <CopyBtn onClick={() => onCopy(trade.accountId, "Account ID")} />
+        <span className="break-all">
+          Account: {displayAccountLabel(trade)}
+        </span>
+        <CopyBtn
+          onClick={() =>
+            onCopy(trade.accountNumber || trade.accountId, "Account")
+          }
+        />
       </p>
       <p className="flex items-start gap-1 text-[11px] text-[var(--text-muted)]">
-        <span className="break-all">Position: {trade.positionId}</span>
-        <CopyBtn onClick={() => onCopy(trade.positionId, "Position ID")} />
+        <span className="break-all">
+          Position ID: {displayTicket(trade)}
+        </span>
+        <CopyBtn
+          onClick={() => onCopy(displayTicket(trade), "Position ID")}
+        />
       </p>
       <p className="mt-1 text-[11px] text-[var(--text-muted)]">
         <span className="inline-flex items-center gap-1">

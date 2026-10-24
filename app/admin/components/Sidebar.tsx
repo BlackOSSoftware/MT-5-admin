@@ -32,6 +32,7 @@ import {
   Clock3,
   Plus,
   RefreshCcw,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -83,6 +84,7 @@ const navSections: {
             { href: "/admin/trades/active-positions", label: "Active Positions", icon: <Activity size={14} /> },
             { href: "/admin/trades/pending-orders", label: "Pending Orders", icon: <Clock3 size={14} /> },
             { href: "/admin/trades/close-trades", label: "Closed Trades", icon: <UserCheck size={14} /> },
+            { href: "/admin/trades/deleted-trades", label: "Deleted Trades", icon: <Trash2 size={14} /> },
             {
               href: "/admin/trades/brokerage-commission",
               label: "Brokerage & Commission",

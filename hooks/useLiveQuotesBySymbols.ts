@@ -178,6 +178,7 @@ export function useLiveQuotesBySymbols(
                     bufferRef.current[s] = createEmptyQuote(s);
                 }
 
+                const prev = bufferRef.current[s];
                 const nextOpen = pickNumber(
                     raw.dayOpen,
                     raw.day_open,
@@ -196,17 +197,45 @@ export function useLiveQuotesBySymbols(
                     raw.prevClose,
                     data?.prevClose
                 );
+                const seedBid = pickNumber(
+                    raw.lastBid,
+                    raw.last_bid,
+                    data?.lastBid,
+                    data?.last_bid,
+                    nextClose
+                );
+                const seedAsk = pickNumber(
+                    raw.lastAsk,
+                    raw.last_ask,
+                    data?.lastAsk,
+                    data?.last_ask,
+                    nextClose
+                );
+
+                // When market is closed (no orderbook ticks yet), show last known price instead of "--".
+                const hasLiveBid = prev.bid !== "--" && Number.isFinite(Number(prev.bid));
+                const hasLiveAsk = prev.ask !== "--" && Number.isFinite(Number(prev.ask));
 
                 const next = {
-                    ...bufferRef.current[s],
+                    ...prev,
                     high:
                         pickNumber(raw.dayHigh, raw.day_high, raw.high, data?.dayHigh, data?.day_high, data?.high) ??
-                        bufferRef.current[s].high,
+                        prev.high,
                     low:
                         pickNumber(raw.dayLow, raw.day_low, raw.low, data?.dayLow, data?.day_low, data?.low) ??
-                        bufferRef.current[s].low,
-                    open: nextOpen ?? bufferRef.current[s].open,
-                    close: nextClose ?? bufferRef.current[s].close,
+                        prev.low,
+                    open: nextOpen ?? prev.open,
+                    close: nextClose ?? prev.close,
+                    bid: hasLiveBid
+                        ? prev.bid
+                        : seedBid !== undefined
+                          ? String(seedBid)
+                          : prev.bid,
+                    ask: hasLiveAsk
+                        ? prev.ask
+                        : seedAsk !== undefined
+                          ? String(seedAsk)
+                          : prev.ask,
                 };
 
                 writeQuoteToAliases(s, next);

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FP Trades",
+  title: "oceanaprofx",
   description: "Admin Dashboard with Theme Support",
 };
 

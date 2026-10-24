@@ -21,6 +21,7 @@ import { useLiveQuotesBySymbols } from "@/hooks/useLiveQuotesBySymbols";
 import { getAccessTokenFromCookie } from "@/services/marketSocket.service";
 import { useInstrumentPrecisionMap } from "@/hooks/instruments/useInstrumentPrecisionMap";
 import { formatPrice } from "@/utils/priceFormat";
+import { displayTicket } from "@/utils/displayIds";
 
 // ================= MOCK DATA =================
 
@@ -301,7 +302,12 @@ export default function Overview() {
                       <p
                         className={`text-[11px] sm:text-base font-semibold tracking-tight tabular-nums drop-shadow-[0_0_2px_rgba(0,0,0,0.18)] ${bidColor}`}
                       >
-                        {formatPrice(live?.bid, precision)}
+                        {formatPrice(
+                          live?.bid && live.bid !== "--"
+                            ? live.bid
+                            : live?.close ?? live?.open,
+                          precision
+                        )}
                       </p>
                     </div>
 
@@ -309,7 +315,12 @@ export default function Overview() {
                       <p
                         className={`text-[11px] sm:text-base font-semibold tracking-tight tabular-nums drop-shadow-[0_0_2px_rgba(0,0,0,0.18)] ${askColor}`}
                       >
-                        {formatPrice(live?.ask, precision)}
+                        {formatPrice(
+                          live?.ask && live.ask !== "--"
+                            ? live.ask
+                            : live?.close ?? live?.open,
+                          precision
+                        )}
                       </p>
                     </div>
                   </div>
@@ -440,7 +451,7 @@ export default function Overview() {
                         </span>
                       </div>
                       <p className="text-[9px] sm:text-xs text-[var(--text-muted)]">
-                        ID: {trade.positionId?.slice(0, 8) ?? "--"}...
+                        Position ID: {displayTicket(trade)}
                       </p>
                     </div>
                     <div className="text-right text-[11px] sm:text-base font-semibold tabular-nums">

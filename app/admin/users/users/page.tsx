@@ -18,6 +18,7 @@ import GlobalLoader from "../../components/ui/GlobalLoader";
 import DragScroll from "../../components/ui/DragScroll";
 import { useAdminUsers } from "@/hooks/useAdminUsers";
 import type { AdminUser } from "@/types/user";
+import PresenceBadge from "@/app/admin/components/ui/PresenceBadge";
 
 const EMPTY_USERS: AdminUser[] = [];
 
@@ -353,11 +354,12 @@ export default function UsersPage() {
         </div>
 
         <DragScroll className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-left text-sm">
+          <table className="w-full min-w-[980px] text-left text-sm">
             <thead className="bg-[var(--input-bg)] text-[var(--text-muted)] text-xs uppercase">
               <tr>
                 <th className="px-4 py-3">#</th>
                 <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Phone</th>
                 <th className="px-4 py-3">User Type</th>
@@ -369,19 +371,19 @@ export default function UsersPage() {
             <tbody>
               {isInitialLoading ? (
                 <tr>
-                  <td colSpan={8} className="py-10 text-center">
+                  <td colSpan={9} className="py-10 text-center">
                     <GlobalLoader />
                   </td>
                 </tr>
               ) : listQuery.isError ? (
                 <tr>
-                  <td colSpan={8} className="py-10 text-center text-sm text-[var(--danger)]">
+                  <td colSpan={9} className="py-10 text-center text-sm text-[var(--danger)]">
                     Failed to load users. Please try again.
                   </td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-10 text-center text-sm text-[var(--text-muted)]">
+                  <td colSpan={9} className="py-10 text-center text-sm text-[var(--text-muted)]">
                     No users found.
                   </td>
                 </tr>
@@ -406,10 +408,13 @@ export default function UsersPage() {
                     <td className="px-4 py-3">
                       <div className="flex flex-col">
                         <span className="font-semibold">{u.name || "--"}</span>
-                        <span className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                          ID: {u._id.slice(0, 8)}...
-                        </span>
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <PresenceBadge
+                        online={Boolean(u.isOnline)}
+                        lastSeenAt={u.lastSeenAt}
+                      />
                     </td>
                     <td className="px-4 py-3">{u.email || "--"}</td>
                     <td className="px-4 py-3">{u.phone || "--"}</td>

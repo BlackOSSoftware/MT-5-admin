@@ -16,7 +16,9 @@ export const useAdminUsers = (
       params.limit ?? 20,
     ],
     queryFn: () => fetchAdminUsers(params),
-    staleTime: 1000 * 30,
+    staleTime: 0,
     placeholderData: keepPreviousData,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: true,
   });

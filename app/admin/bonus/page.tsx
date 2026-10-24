@@ -371,14 +371,16 @@ export default function BonusPage() {
                         type="button"
                         onClick={() => {
                           setSelectedUserId(user._id);
-                          setSelectedUserName(user.name || user.email || user._id);
-                          setUserSearchInput(user.name || user.email || user._id);
+                          setSelectedUserName(user.name || user.email || "--");
+                          setUserSearchInput(user.name || user.email || "--");
                           setSelectedAccountId("");
                           setCreditResult(null);
                         }}
                         className="block w-full px-3 py-2 text-left text-xs sm:text-sm hover:bg-[var(--hover-bg)] border-b border-[var(--card-border)] last:border-b-0"
                       >
-                        <span className="block font-medium">{user.name ?? user._id}</span>
+                        <span className="block font-medium">
+                          {user.name || user.email || "--"}
+                        </span>
                         <span className="block text-[10px] text-[var(--text-muted)]">
                           {user.email ?? "--"}
                         </span>

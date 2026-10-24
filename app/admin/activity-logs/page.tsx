@@ -322,12 +322,6 @@ export default function ActivityLogsPage() {
                     Actor
                   </span>
                 </th>
-                <th className="w-[160px]">
-                  <span className="inline-flex items-center gap-2">
-                    <Fingerprint size={13} />
-                    Actor ID
-                  </span>
-                </th>
                 <th className="w-[200px]">
                   <span className="inline-flex items-center gap-2">
                     <CalendarClock size={13} />
@@ -379,9 +373,6 @@ export default function ActivityLogsPage() {
                     <td>
                       <div className="flex flex-col">
                         <span className="font-semibold">{log.user_name || "--"}</span>
-                        <span className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                          ID: {shortId(log.user_id)}
-                        </span>
                       </div>
                     </td>
                     <td className="text-[var(--text-muted)]">
@@ -391,9 +382,6 @@ export default function ActivityLogsPage() {
                       <span className={`pill text-xs font-medium ${actorTone(log.actor_type)}`}>
                         {formatLabel(log.actor_type)}
                       </span>
-                    </td>
-                    <td className="text-[var(--text-muted)]">
-                      {shortId(log.actor_id)}
                     </td>
                     <td className="text-[var(--text-muted)] whitespace-nowrap">
                       {formatDateTime(log.createdAt)}

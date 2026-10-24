@@ -19,6 +19,12 @@ export type TradeAdminBrokerageItem = {
   pnl: number;
   createdAt: string;
   updatedAt: string;
+  userName?: string;
+  userEmail?: string;
+  accountNumber?: string;
+  user_name?: string;
+  user_email?: string;
+  account_number?: string;
 };
 
 export type TradeAdminBrokeragePagination = {
@@ -57,8 +63,13 @@ export type TradeAdminClosedTrade = {
   _id: string;
   userId: string;
   accountId: string;
+  userName?: string;
+  userEmail?: string;
+  accountNumber?: string;
   ipAddress?: string;
   positionId: string;
+  ticket?: number | null;
+  closeTicket?: number | null;
   symbol: string;
   side: TradeSide | string;
   orderType: TradeOrderType | string;
@@ -119,8 +130,13 @@ export type TradeAdminOpenTrade = {
   _id: string;
   userId: string;
   accountId: string;
+  userName?: string;
+  userEmail?: string;
+  accountNumber?: string;
   ipAddress?: string;
   positionId: string;
+  ticket?: number | null;
+  closeTicket?: number | null;
   symbol: string;
   side: TradeSide | string;
   orderType: TradeOrderType | string;
@@ -188,7 +204,11 @@ export type TradeAdminPendingOrder = {
   _id: string;
   userId: string;
   accountId: string;
+  userName?: string;
+  userEmail?: string;
+  accountNumber?: string;
   orderId: string;
+  ticket?: number | null;
   symbol: string;
   side: TradeSide | string;
   orderType: TradeOrderType | string;
@@ -286,6 +306,8 @@ export type TradeAdminPendingOrderPayload = {
 export type TradeAdminPendingModifyPayload = {
   accountId: string;
   orderId: string;
+  userId?: string;
+  volume?: number;
   price?: number;
   stopLoss?: number | null;
   takeProfit?: number | null;
@@ -301,6 +323,8 @@ export type TradeAdminPositionModifyPayload = {
   accountId: string;
   positionId: string;
   userId?: string;
+  volume?: number;
+  openPrice?: number;
   stopLoss?: number | null;
   takeProfit?: number | null;
 };
@@ -309,6 +333,23 @@ export type TradeAdminPositionClosePayload = {
   accountId: string;
   positionId: string;
   userId?: string;
+};
+
+export type TradeAdminClosedModifyPayload = {
+  accountId: string;
+  userId: string;
+  positionId?: string;
+  tradeId?: string;
+  volume?: number;
+  openPrice?: number;
+  closePrice?: number;
+  stopLoss?: number | null;
+  takeProfit?: number | null;
+  commission?: number;
+  spread?: number;
+  swap?: number;
+  realizedPnL?: number;
+  closeReason?: string | null;
 };
 
 export const getTradeAdminSummary = async (): Promise<TradeAdminSummary> => {
@@ -488,4 +529,98 @@ export const closeTradeAdminPosition = async (
 ): Promise<TradeAdminActionResponse> => {
   const res = await api.post("/trade-admin/trade/position/close", payload);
   return res.data as TradeAdminActionResponse;
+};
+
+export const modifyTradeAdminClosedTrade = async (
+  payload: TradeAdminClosedModifyPayload
+): Promise<TradeAdminActionResponse> => {
+  const res = await api.patch("/trade-admin/trade/closed/modify", payload);
+  return res.data as TradeAdminActionResponse;
+};
+
+export type TradeAdminDeleteKind = "LIVE" | "CLOSED" | "PENDING";
+
+export type TradeAdminDeletePayload = {
+  kind: TradeAdminDeleteKind;
+  accountId: string;
+  userId: string;
+  tradeId?: string;
+  positionId?: string;
+  orderId?: string;
+};
+
+export type TradeAdminRestorePayload = TradeAdminDeletePayload;
+
+export type TradeAdminDeletedTrade = {
+  _id: string;
+  kind: TradeAdminDeleteKind;
+  source?: "TRADE" | "PENDING";
+  userId: string;
+  accountId: string;
+  userName?: string;
+  userEmail?: string;
+  accountNumber?: string;
+  positionId?: string;
+  orderId?: string;
+  ticket?: number | null;
+  symbol?: string;
+  side?: string;
+  status?: string;
+  volume?: number;
+  openPrice?: number;
+  closePrice?: number;
+  price?: number;
+  realizedPnL?: number;
+  deleteBalanceDelta?: number;
+  deletedAt?: string | null;
+  isDeleted?: boolean;
+};
+
+export type TradeAdminDeletedTradesParams = {
+  page: number;
+  limit: number;
+  kind?: "ALL" | TradeAdminDeleteKind;
+  userId?: string;
+  accountId?: string;
+  symbol?: string;
+};
+
+export type TradeAdminDeletedTradesResponse = {
+  success?: boolean;
+  data: TradeAdminDeletedTrade[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+};
+
+export const deleteTradeAdminTrade = async (
+  payload: TradeAdminDeletePayload
+): Promise<TradeAdminActionResponse> => {
+  const res = await api.post("/trade-admin/trade/delete", payload);
+  return res.data as TradeAdminActionResponse;
+};
+
+export const restoreTradeAdminTrade = async (
+  payload: TradeAdminRestorePayload
+): Promise<TradeAdminActionResponse> => {
+  const res = await api.post("/trade-admin/trade/restore", payload);
+  return res.data as TradeAdminActionResponse;
+};
+
+export const getTradeAdminDeletedTrades = async (
+  params: TradeAdminDeletedTradesParams
+): Promise<TradeAdminDeletedTradesResponse> => {
+  const query: Record<string, string | number> = {
+    page: params.page,
+    limit: params.limit,
+  };
+  if (params.kind && params.kind !== "ALL") query.kind = params.kind;
+  if (params.userId?.trim()) query.userId = params.userId.trim();
+  if (params.accountId?.trim()) query.accountId = params.accountId.trim();
+  if (params.symbol?.trim()) query.symbol = params.symbol.trim().toUpperCase();
+  const res = await api.get("/trade-admin/trades/deleted", { params: query });
+  return res.data as TradeAdminDeletedTradesResponse;
 };
