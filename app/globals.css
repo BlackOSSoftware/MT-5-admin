@@ -7,6 +7,8 @@
 
 /* ----------------- LIGHT THEME ----------------- */
 :root{
+  color-scheme: light;
+
   /* brand */
   --primary: #1f6fd6;          /* chart blue */
   --primary-dark: #2e8b74;     /* growth green */
@@ -15,7 +17,7 @@
   /* backgrounds / surfaces */
   --background: #ffffff;       /* pure white */
   --card-bg: #ffffff;          /* pure white */
-  --hover-bg: #f7f7f7;
+  --hover-bg: #f3f5f8;
 
   /* text */
   --foreground: #0b1320;
@@ -24,7 +26,10 @@
   /* borders / inputs */
   --card-border: #e6e6e6;
   --input-bg: #ffffff;
-  --input-border: #e0e0e0;
+  --input-border: #d5dbe6;
+  --caret: #0b1320;
+  --selection-bg: rgba(31, 111, 214, 0.22);
+  --selection-fg: #0b1320;
 
   /* states */
   --success: #1f9d6a;          /* green from arrow tail */
@@ -43,6 +48,8 @@
 
 /* ----------------- DARK THEME ----------------- */
 html.dark{
+  color-scheme: dark;
+
   /* brand */
   --primary: #3b8cff;          /* electric chart blue */
   --primary-dark: #3fbf9a;     /* growth green */
@@ -61,6 +68,9 @@ html.dark{
   --card-border: #1e2c44;
   --input-bg: #0e1627;
   --input-border: #223356;
+  --caret: #e7edf7;
+  --selection-bg: rgba(59, 140, 255, 0.35);
+  --selection-fg: #e7edf7;
 
   /* states */
   --success: #3fd2a2;
@@ -88,10 +98,16 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
+  caret-color: var(--caret);
   font-family: Inter, Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.45;
+}
+
+::selection {
+  background: var(--selection-bg);
+  color: var(--selection-fg);
 }
 
 /* Controlled transitions (fast, snappy) */
@@ -101,6 +117,48 @@ body {
     color var(--duration) ease,
     border-color var(--duration) ease,
     box-shadow var(--duration) ease;
+}
+
+/* Native form controls follow admin theme (select popup, caret, options) */
+input,
+textarea,
+select,
+button {
+  color: var(--foreground);
+  caret-color: var(--caret);
+  accent-color: var(--primary);
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+textarea,
+select {
+  background-color: var(--input-bg);
+  color: var(--foreground);
+  border-color: var(--input-border);
+}
+
+select {
+  color-scheme: inherit;
+}
+
+select option,
+select optgroup {
+  background-color: var(--card-bg);
+  color: var(--foreground);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+input:disabled,
+textarea:disabled,
+select:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  color: var(--text-muted);
 }
 
 /* ======================================================
@@ -285,7 +343,7 @@ body {
 /* Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(0,0,0,0.85) transparent;
+  scrollbar-color: color-mix(in srgb, var(--foreground) 35%, transparent) transparent;
 }
 
 /* Webkit (Chrome, Edge, Safari) */
@@ -299,24 +357,24 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,0.85);
+  background: color-mix(in srgb, var(--foreground) 35%, transparent);
   border-radius: 999px;
 }
 
 /* Hover = slightly stronger */
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0,0,0,0.95);
+  background: color-mix(in srgb, var(--foreground) 55%, transparent);
 }
 
 /* ===============================
    DARK THEME TUNING
    =============================== */
 html.dark ::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,0.85);
+  background: color-mix(in srgb, var(--foreground) 28%, transparent);
 }
 
 html.dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0,0,0,0.95);
+  background: color-mix(in srgb, var(--foreground) 45%, transparent);
 }
 
 /* Hide scrollbar buttons (up/down arrows) */

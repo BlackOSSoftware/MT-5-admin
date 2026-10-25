@@ -120,7 +120,7 @@ export default function CreateTraderFund() {
     setSubmitSuccess(null);
 
     if (!selectedUserId) {
-      setSubmitError("Please select a user.");
+      setSubmitError("Please search and click a user from the list to select them.");
       return;
     }
 
@@ -130,8 +130,8 @@ export default function CreateTraderFund() {
     }
 
     const parsedAmount = Number(amount);
-    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-      setSubmitError("Please enter a valid amount.");
+    if (!Number.isFinite(parsedAmount) || parsedAmount < 1) {
+      setSubmitError("Please enter a valid amount (minimum 1).");
       return;
     }
 
@@ -532,9 +532,9 @@ export default function CreateTraderFund() {
           )}
 
           {submitError && (
-            <p className="md:col-span-2 text-sm text-[var(--danger)]">
+            <div className="md:col-span-2 rounded-lg border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-700">
               {submitError}
-            </p>
+            </div>
           )}
           {/* Submit Button */}
           <div className="md:col-span-2 flex justify-center mt-4 sm:mt-6">
@@ -586,8 +586,8 @@ export default function CreateTraderFund() {
               </div>
 
               <div className="mt-4 rounded-lg border border-white/40 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 p-3 text-xs sm:text-sm backdrop-blur-sm dark:border-white/15">
-                <p>Amount: {submitSuccess.data.amount}</p>
-                <p>Status: {submitSuccess.data.status}</p>
+                <p>Amount: {submitSuccess.data?.amount ?? "--"}</p>
+                <p>Status: {submitSuccess.data?.status ?? "--"}</p>
               </div>
 
               <div className="mt-5 flex justify-end">

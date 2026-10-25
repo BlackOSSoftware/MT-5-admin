@@ -22,6 +22,7 @@ import {
   Eye,
   EyeOff,
   FlaskConical,
+  Gift,
   Globe,
   KeyRound,
   Copy,
@@ -58,6 +59,7 @@ import { useAdminInternalTransfer } from "@/hooks/useAdminInternalTransfer";
 import { useDeleteAdminUser } from "@/hooks/useDeleteAdminUser";
 import { useDeleteAdminUserTradeAccount } from "@/hooks/useDeleteAdminUserTradeAccount";
 import { useBonusCredit, useTradableFundCredit } from "@/hooks/bonus/useBonusCredit";
+import { useAdminUserReferralSummary } from "@/hooks/referrals/useAdminUserReferralSummary";
 import {
   useResetAccountTradePassword,
   useResetAccountWatchPassword,
@@ -386,6 +388,7 @@ export default function UserViewPage() {
   const userId = Array.isArray(rawId) ? rawId[0] : rawId;
 
   const userQuery = useAdminUser(userId);
+  const referralSummaryQuery = useAdminUserReferralSummary(userId);
   const updateMutation = useUpdateAdminUser();
   const changePasswordMutation = useChangeAdminUserPassword();
   const updateAccountMutation = useUpdateAdminUserAccount();
@@ -2122,6 +2125,73 @@ export default function UserViewPage() {
             </div>
           </div>
         )}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+            <Users size={14} /> Direct referrals
+          </div>
+          <p className="mt-2 text-2xl font-semibold tabular-nums">
+            {referralSummaryQuery.isLoading
+              ? "…"
+              : referralSummaryQuery.data?.totalReferrals ?? 0}
+          </p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Users referred by this account
+          </p>
+        </div>
+        <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+            <Gift size={14} /> Referral bonus earned
+          </div>
+          <p className="mt-2 text-2xl font-semibold tabular-nums text-emerald-600">
+            $
+            {referralSummaryQuery.isLoading
+              ? "…"
+              : formatAmount(referralSummaryQuery.data?.totalEarned ?? 0)}
+          </p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Total approved referral rewards
+          </p>
+        </div>
+        <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+            <DollarSign size={14} /> Referral balance
+          </div>
+          <p className="mt-2 text-2xl font-semibold tabular-nums">
+            $
+            {referralSummaryQuery.isLoading
+              ? "…"
+              : formatAmount(referralSummaryQuery.data?.referralBalance ?? 0)}
+          </p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Available referral wallet balance
+          </p>
+        </div>
+        <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+            <Percent size={14} /> Pending rewards
+          </div>
+          <p className="mt-2 text-2xl font-semibold tabular-nums">
+            {referralSummaryQuery.isLoading
+              ? "…"
+              : referralSummaryQuery.data?.pendingCount ?? 0}
+            <span className="ml-2 text-base font-medium text-[var(--text-muted)]">
+              ($
+              {referralSummaryQuery.isLoading
+                ? "…"
+                : formatAmount(referralSummaryQuery.data?.pendingAmount ?? 0)}
+              )
+            </span>
+          </p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Eligible / requested, not yet approved
+            {referralSummaryQuery.data?.referralCode
+              ? ` · Code ${referralSummaryQuery.data.referralCode}`
+              : ""}
+          </p>
+        </div>
       </div>
 
 	      <div className="flex flex-wrap gap-2">
@@ -4308,6 +4378,22 @@ export default function UserViewPage() {
                 {(profileSnapshot.kycStatus || "STATUS").replaceAll("_", " ")}
               </span>
             </div>
+          </div>
+          <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] p-3">
+            <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+              <Users size={12} /> Direct Referrals
+            </div>
+            <p className="mt-1 text-sm font-medium tabular-nums">
+              {referralSummaryQuery.data?.totalReferrals ?? 0}
+            </p>
+          </div>
+          <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] p-3">
+            <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+              <Gift size={12} /> Referral Bonus Earned
+            </div>
+            <p className="mt-1 text-sm font-medium tabular-nums text-emerald-600">
+              ${formatAmount(referralSummaryQuery.data?.totalEarned ?? 0)}
+            </p>
           </div>
           <div className="rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] p-3">
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-[var(--text-muted)]">

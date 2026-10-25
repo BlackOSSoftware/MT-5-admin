@@ -145,7 +145,8 @@ const navSections: {
           label: "Referral",
           icon: <Gift size={18} />,
           children: [
-            { href: "/admin/referral", label: "Referral", icon: <Gift size={14} /> },
+            { href: "/admin/referral", label: "Reward Approvals", icon: <Gift size={14} /> },
+            { href: "/admin/referral/network", label: "Network Report", icon: <Users size={14} /> },
             { href: "/admin/bonus", label: "Bonus", icon: <DollarSign size={14} /> },
           ],
         },

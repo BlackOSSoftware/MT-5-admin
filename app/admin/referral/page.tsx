@@ -17,6 +17,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import Link from "next/link";
 import Pagination from "@/app/admin/components/ui/pagination";
 import { useAdminReferralRewards } from "@/hooks/referrals/useAdminReferralRewards";
 import {
@@ -42,6 +43,7 @@ type RewardRow = {
   rewardId?: string;
   amount?: number;
   rewardAmount?: number;
+  reward_amount?: number;
   bonusAmount?: number;
   currency?: string;
   rewardCurrency?: string;
@@ -49,14 +51,20 @@ type RewardRow = {
   status?: ReferralRewardStatus | string;
   createdAt?: string;
   requestedAt?: string;
+  requested_at?: string;
   approvedAt?: string;
+  approved_at?: string;
   rejectedAt?: string;
+  rejected_at?: string;
   updatedAt?: string;
   actionAt?: string;
   rejectionReason?: string;
+  rejection_reason?: string;
   reason?: string;
   referrerUser?: RewardUser;
   referredUser?: RewardUser;
+  referrer_user?: RewardUser | string;
+  referred_user?: RewardUser | string;
   referrer?: RewardUser;
   referred?: RewardUser;
   referrerUserId?: string;
@@ -148,9 +156,16 @@ const getDefaultFilters = (): RewardFilters => ({
 
 const getRewardId = (row: RewardRow) => row._id ?? row.id ?? row.rewardId ?? "";
 
+const asUserObject = (value?: RewardUser | string | null): RewardUser | undefined => {
+  if (!value) return undefined;
+  if (typeof value === "string") return { _id: value };
+  return value;
+};
+
 const getRewardAmount = (row: RewardRow) => {
   if (typeof row.amount === "number") return row.amount;
   if (typeof row.rewardAmount === "number") return row.rewardAmount;
+  if (typeof row.reward_amount === "number") return row.reward_amount;
   if (typeof row.bonusAmount === "number") return row.bonusAmount;
   return undefined;
 };
@@ -177,8 +192,12 @@ const formatAmount = (amount?: number, currency?: string) => {
 const resolveUser = (row: RewardRow, kind: "referrer" | "referred") => {
   const direct =
     kind === "referrer"
-      ? row.referrerUser ?? row.referrer
-      : row.referredUser ?? row.referred;
+      ? asUserObject(row.referrerUser) ??
+        asUserObject(row.referrer) ??
+        asUserObject(row.referrer_user)
+      : asUserObject(row.referredUser) ??
+        asUserObject(row.referred) ??
+        asUserObject(row.referred_user);
 
   const id =
     direct?._id ??
@@ -217,9 +236,15 @@ const getStatusPill = (status?: string) => {
 };
 
 const getActionMeta = (row: RewardRow) => {
-  if (row.approvedAt) return { label: "Approved", date: row.approvedAt };
-  if (row.rejectedAt) return { label: "Rejected", date: row.rejectedAt };
-  if (row.requestedAt) return { label: "Requested", date: row.requestedAt };
+  if (row.approvedAt || row.approved_at) {
+    return { label: "Approved", date: row.approvedAt ?? row.approved_at };
+  }
+  if (row.rejectedAt || row.rejected_at) {
+    return { label: "Rejected", date: row.rejectedAt ?? row.rejected_at };
+  }
+  if (row.requestedAt || row.requested_at) {
+    return { label: "Requested", date: row.requestedAt ?? row.requested_at };
+  }
   if (row.actionAt) return { label: "Action", date: row.actionAt };
   if (row.updatedAt) return { label: "Updated", date: row.updatedAt };
   return { label: "Action", date: undefined };
@@ -353,6 +378,13 @@ export default function ReferralPage() {
             Review and manage referral reward requests
           </p>
         </div>
+        <Link
+          href="/admin/referral/network"
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] px-4 py-2 text-sm font-semibold hover:bg-[var(--hover-bg)]"
+        >
+          <Users size={16} />
+          Network Report
+        </Link>
       </div>
 
       {/* FILTERS */}
@@ -832,16 +864,29 @@ export default function ReferralPage() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <DateCard label="Created" value={selected.createdAt} />
-                    <DateCard label="Requested" value={selected.requestedAt} />
-                    <DateCard label="Approved" value={selected.approvedAt} />
-                    <DateCard label="Rejected" value={selected.rejectedAt} />
+                    <DateCard
+                      label="Requested"
+                      value={selected.requestedAt ?? selected.requested_at}
+                    />
+                    <DateCard
+                      label="Approved"
+                      value={selected.approvedAt ?? selected.approved_at}
+                    />
+                    <DateCard
+                      label="Rejected"
+                      value={selected.rejectedAt ?? selected.rejected_at}
+                    />
                   </div>
 
-                  {(selected.rejectionReason || selected.reason) && (
+                  {(selected.rejectionReason ||
+                    selected.rejection_reason ||
+                    selected.reason) && (
                     <div className="rounded-xl border border-[var(--card-border)] bg-[var(--input-bg)] px-3 py-2">
                       <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Rejection Reason</p>
                       <p className="text-sm text-[var(--foreground)]">
-                        {selected.rejectionReason || selected.reason}
+                        {selected.rejectionReason ||
+                          selected.rejection_reason ||
+                          selected.reason}
                       </p>
                     </div>
                   )}
