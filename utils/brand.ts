@@ -7,30 +7,12 @@ export type BrandSource = {
   }> | null;
 };
 
-/** Visible product/admin brand for header + browser tab. */
-export function resolveBrandName(source: BrandSource): string {
-  if (source.platformRole === "SUPER_ADMIN") {
-    return "Super Admin";
-  }
-
-  const fromBroker =
-    source.brokerDisplayName ||
-    source.memberships?.[0]?.broker?.displayName ||
-    "";
-
-  if (fromBroker.trim()) return fromBroker.trim();
-
-  const fromName = String(source.name || "").trim();
-  if (fromName) {
-    // "Oceana Pro FX Admin" → "Oceana Pro FX"
-    return fromName.replace(/\s+Admin$/i, "").trim() || fromName;
-  }
-
+/** Visible product/admin brand for header + browser tab. Always neutral. */
+export function resolveBrandName(_source?: BrandSource): string {
   return "Admin";
 }
 
-export function resolveBrandSubtitle(source: BrandSource): string {
-  if (source.platformRole === "SUPER_ADMIN") return "PLATFORM";
+export function resolveBrandSubtitle(_source?: BrandSource): string {
   return "ADMIN";
 }
 

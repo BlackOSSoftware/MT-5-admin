@@ -1,47 +1,19 @@
 "use client";
 
 import { Moon, Sun, Volume2, VolumeX } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useClickSoundSettings } from "./ClickSoundProvider";
-import { useAdminMe } from "@/hooks/useAdmin";
-import {
-  applyDocumentTitle,
-  resolveBrandName,
-  resolveBrandSubtitle,
-  type BrandSource,
-} from "@/utils/brand";
+import { applyDocumentTitle } from "@/utils/brand";
 
 export default function Topbar() {
   const { enabled: clickSoundEnabled, toggle: toggleClickSound } =
     useClickSoundSettings();
-  const { data: me } = useAdminMe();
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     if (typeof window === "undefined") return "light";
     return localStorage.theme === "dark" ? "dark" : "light";
   });
 
-  const brand = useMemo(() => {
-    let memberships: BrandSource["memberships"] = [];
-    try {
-      memberships = JSON.parse(localStorage.getItem("memberships") || "[]");
-    } catch {
-      memberships = [];
-    }
-    const platformRole =
-      (me as { platformRole?: string } | undefined)?.platformRole ||
-      localStorage.getItem("platformRole");
-
-    return {
-      name: resolveBrandName({
-        platformRole,
-        name: (me as { name?: string } | undefined)?.name,
-        brokerDisplayName: (me as { brokerDisplayName?: string } | undefined)
-          ?.brokerDisplayName,
-        memberships,
-      }),
-      subtitle: resolveBrandSubtitle({ platformRole }),
-    };
-  }, [me]);
+  const brandName = "Admin";
 
   useEffect(() => {
     const root = document.documentElement;
@@ -56,17 +28,16 @@ export default function Topbar() {
   }, [theme]);
 
   useEffect(() => {
-    applyDocumentTitle(brand.name);
-    localStorage.setItem("brandName", brand.name);
-  }, [brand.name]);
+    applyDocumentTitle(brandName);
+    localStorage.setItem("brandName", brandName);
+  }, [brandName]);
 
   const toggleTheme = () => {
     setTheme((prev) => (prev === "light" ? "dark" : "light"));
   };
 
-  const parts = brand.name.split(/\s+/).filter(Boolean);
-  const line1 = parts[0] || "Admin";
-  const line2 = parts.slice(1).join(" ") || brand.subtitle;
+  const line1 = brandName;
+  const line2 = "ADMIN";
 
   return (
     <header className="w-full sticky top-0 z-50 border-b border-[var(--card-border)] bg-[var(--card-bg)]">
@@ -112,7 +83,3 @@ export default function Topbar() {
     </header>
   );
 }
-
-type BrandSourceMemberships = Array<{
-  broker?: { displayName?: string; code?: string } | null;
-}>;

@@ -16,7 +16,7 @@ import { useHealthStatus } from "@/hooks/useHealthStatus";
 import type { HealthLogEntry } from "@/types/health";
 import GlobalLoader from "../components/ui/GlobalLoader";
 
-const DEFAULT_HEALTH_ENDPOINT = "https://backend.fptrades.com/api/v1/health";
+const DEFAULT_HEALTH_ENDPOINT = "http://localhost:4000/api/v1/health";
 
 const formatBytes = (value?: number) => {
   if (value === undefined || value === null || Number.isNaN(value)) return "--";

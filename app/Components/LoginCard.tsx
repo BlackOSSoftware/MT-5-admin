@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useLogin } from "@/hooks/useAuth";
 import { Eye, EyeOff, AtSign, KeyRound, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
-import { applyDocumentTitle, resolveBrandName } from "@/utils/brand";
+import { applyDocumentTitle } from "@/utils/brand";
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -75,12 +75,8 @@ export default function AdminLogin() {
             JSON.stringify(memberships || [])
           );
 
-          const brand = resolveBrandName({
-            platformRole,
-            memberships: memberships || [],
-          });
-          localStorage.setItem("brandName", brand);
-          applyDocumentTitle(brand);
+          localStorage.setItem("brandName", "Admin");
+          applyDocumentTitle("Admin");
 
           router.push("/admin");
         },
@@ -174,7 +170,7 @@ export default function AdminLogin() {
             </div>
 
             <h2 className="text-3xl font-bold text-[var(--primary)] mb-2">
-              Admin Control 
+              Admin
             </h2>
 
             <p className="text-sm text-[var(--text-muted)]">
@@ -274,7 +270,7 @@ export default function AdminLogin() {
 
           {/* Footer */}
           <div className="mt-6 text-center text-xs text-[var(--text-muted)]">
-            © {new Date().getFullYear()} Admin Panel
+            © {new Date().getFullYear()} Admin
           </div>
 
         </motion.div>
