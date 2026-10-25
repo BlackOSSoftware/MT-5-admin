@@ -518,7 +518,7 @@ export default function ReferralPage() {
             className={`whitespace-nowrap px-2.5 py-1 text-[10px] font-semibold rounded-lg transition-all sm:px-4 sm:py-2 sm:text-sm ${
               !filters.status
                 ? "bg-[var(--primary)] text-white shadow-none"
-                : "text-[var(--text-muted)] hover:bg-white/70"
+                : "text-[var(--text-muted)] hover:bg-[var(--hover-bg)]"
             }`}
           >
             <span className="inline-flex items-center gap-1.5">
@@ -538,9 +538,9 @@ export default function ReferralPage() {
                     : status === "REJECTED"
                     ? "bg-[var(--danger)]/15 text-[var(--danger)] border border-[color-mix(in_srgb,var(--danger)_35%,transparent)]"
                     : status === "REQUESTED"
-                    ? "bg-[var(--accent)]/20 text-[var(--accent)] border border-[color-mix(in_srgb,var(--accent)_40%,transparent)]"
-                    : "bg-[var(--muted)]/30 text-[var(--foreground)] border border-[color-mix(in_srgb,var(--foreground)_15%,transparent)]"
-                  : "text-[var(--text-muted)] hover:bg-white/70"
+                    ? "bg-[color-mix(in_srgb,var(--accent)_22%,transparent)] text-[color-mix(in_srgb,var(--foreground)_70%,#8a6a00)] border border-[color-mix(in_srgb,var(--accent)_45%,transparent)] dark:text-[var(--accent)]"
+                    : "bg-[var(--muted)] text-[var(--foreground)] border border-[var(--card-border)]"
+                  : "text-[var(--text-muted)] hover:bg-[var(--hover-bg)]"
               }`}
             >
               <span className="inline-flex items-center gap-1.5">
@@ -936,7 +936,7 @@ export default function ReferralPage() {
                         whileTap={{ scale: 0.99 }}
                         onClick={handleReject}
                         disabled={rejectReason.trim().length === 0 || reject.isPending}
-                        className="btn w-full h-11 text-sm sm:text-base bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="btn w-full h-11 text-sm sm:text-base bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {reject.isPending ? (
                           <>

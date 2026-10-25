@@ -21,7 +21,9 @@
 
   /* text */
   --foreground: #0b1320;
+  --text-main: #0b1320;
   --text-muted: #5c6b82;
+  --muted: #e8edf5;
 
   /* borders / inputs */
   --card-border: #e6e6e6;
@@ -62,7 +64,9 @@ html.dark{
 
   /* text */
   --foreground: #e7edf7;       /* soft white */
+  --text-main: #e7edf7;
   --text-muted: #9fb0c7;
+  --muted: #1a2740;
 
   /* borders / inputs */
   --card-border: #1e2c44;
@@ -119,12 +123,18 @@ body {
     box-shadow var(--duration) ease;
 }
 
-/* Native form controls follow admin theme (select popup, caret, options) */
+/* Native form controls follow admin theme (select popup, caret, options).
+   Do NOT force `color` on `button` — it overrides Tailwind text-* utilities
+   (Account Plan Edit, Referral tabs, primary CTAs, etc.). */
 input,
 textarea,
-select,
-button {
+select {
   color: var(--foreground);
+  caret-color: var(--caret);
+  accent-color: var(--primary);
+}
+
+button {
   caret-color: var(--caret);
   accent-color: var(--primary);
 }

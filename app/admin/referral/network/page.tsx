@@ -287,7 +287,7 @@ export default function ReferralNetworkPage() {
               onClick={() => setTab(item.key)}
               className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold sm:text-sm ${
                 tab === item.key
-                  ? "bg-[var(--foreground)] text-[var(--card-bg)]"
+                  ? "bg-[var(--primary)] text-white"
                   : "text-[var(--text-muted)] hover:bg-[var(--hover-bg)]"
               }`}
             >

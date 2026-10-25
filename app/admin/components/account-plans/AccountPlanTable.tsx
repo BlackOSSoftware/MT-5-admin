@@ -200,7 +200,7 @@ function PlanRow({
             <button
               type="button"
               onClick={() => onEdit(plan)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[var(--foreground)] px-3 text-xs font-semibold text-[var(--card-bg)] transition hover:opacity-90"
+              className="btn btn-primary h-9 px-3 text-xs"
             >
               <Pencil size={13} />
               Edit
@@ -209,7 +209,7 @@ function PlanRow({
               type="button"
               onClick={() => onDelete(plan._id)}
               aria-label={`Delete ${plan.name}`}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-rose-500/35 bg-rose-500/10 text-rose-700 transition hover:bg-rose-500/20"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[color-mix(in_srgb,var(--danger)_35%,transparent)] bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] text-[var(--danger)] transition hover:bg-[color-mix(in_srgb,var(--danger)_20%,transparent)]"
             >
               <Trash2 size={14} />
             </button>
