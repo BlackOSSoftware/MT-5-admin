@@ -14,8 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "oceanaprofx",
-  description: "Admin Dashboard with Theme Support",
+  title: "Admin",
 };
 
 export default function RootLayout({

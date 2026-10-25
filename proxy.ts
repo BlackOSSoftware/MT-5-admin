@@ -8,26 +8,22 @@ export function proxy(req: NextRequest) {
 
   // ❌ Block dashboard without login
   if (pathname.startsWith("/admin") && !token) {
-    return NextResponse.redirect(
-      new URL("/", req.url)
-    );
+    return NextResponse.redirect(new URL("/", req.url));
+  }
+
+  // Old /superadmin URL → same admin panel
+  if (pathname.startsWith("/superadmin")) {
+    return NextResponse.redirect(new URL("/admin", req.url));
   }
 
   // 🔁 Logged-in user should not see login/signup
-  if (
-    (pathname === "/" || pathname === "/") &&
-    token
-  ) {
-    return NextResponse.redirect(
-      new URL("/admin", req.url)
-    );
+  if ((pathname === "/" || pathname === "/") && token) {
+    return NextResponse.redirect(new URL("/admin", req.url));
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    "/admin/:path*",
-  ],
+  matcher: ["/admin/:path*", "/superadmin/:path*", "/"],
 };

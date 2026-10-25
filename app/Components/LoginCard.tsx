@@ -1,11 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useLogin } from "@/hooks/useAuth";
 import { Eye, EyeOff, AtSign, KeyRound, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
+import { applyDocumentTitle, resolveBrandName } from "@/utils/brand";
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -16,6 +17,10 @@ export default function AdminLogin() {
   const [showPassword, setShowPassword] = useState<boolean>(false);
 
   const { mutate, isPending } = useLogin();
+
+  useEffect(() => {
+    applyDocumentTitle("Admin Login");
+  }, []);
 
   const handleLogin = (): void => {
     setErrorMsg("");
@@ -28,7 +33,13 @@ export default function AdminLogin() {
       },
       {
         onSuccess: (res) => {
-          const { accessToken, role } = res.data;
+          const {
+            accessToken,
+            role,
+            platformRole,
+            brokerId,
+            memberships,
+          } = res.data;
 
           if (role !== "ADMIN") {
             setErrorMsg("Access denied. Admin only.");
@@ -37,6 +48,39 @@ export default function AdminLogin() {
 
           document.cookie = `accessToken=${accessToken}; path=/;`;
           localStorage.setItem("token", accessToken);
+          if (platformRole) {
+            localStorage.setItem("platformRole", platformRole);
+          } else {
+            localStorage.removeItem("platformRole");
+          }
+
+          // SuperAdmin = same /admin panel, no broker filter (sees all data).
+          // Broker Admin = scoped to their broker only.
+          if (platformRole === "SUPER_ADMIN") {
+            localStorage.removeItem("brokerId");
+          } else {
+            const activeBrokerId =
+              brokerId ||
+              memberships?.[0]?.brokerId ||
+              memberships?.[0]?.broker?._id ||
+              "";
+            if (activeBrokerId) {
+              localStorage.setItem("brokerId", String(activeBrokerId));
+            } else {
+              localStorage.removeItem("brokerId");
+            }
+          }
+          localStorage.setItem(
+            "memberships",
+            JSON.stringify(memberships || [])
+          );
+
+          const brand = resolveBrandName({
+            platformRole,
+            memberships: memberships || [],
+          });
+          localStorage.setItem("brandName", brand);
+          applyDocumentTitle(brand);
 
           router.push("/admin");
         },
@@ -230,7 +274,7 @@ export default function AdminLogin() {
 
           {/* Footer */}
           <div className="mt-6 text-center text-xs text-[var(--text-muted)]">
-            © {new Date().getFullYear()} oceanaprofx
+            © {new Date().getFullYear()} Admin Panel
           </div>
 
         </motion.div>

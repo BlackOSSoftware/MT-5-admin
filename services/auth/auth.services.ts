@@ -6,12 +6,28 @@ export type LoginPayload = {
   fcmToken: null;
 };
 
+export type BrokerMembership = {
+  brokerId: string;
+  role: string;
+  permissions: string[];
+  broker?: {
+    _id: string;
+    code: string;
+    displayName: string;
+    status?: string;
+  } | null;
+};
+
 export type LoginResponse = {
   success: boolean;
   data: {
     accessToken: string;
     refreshToken: string;
     role: string;
+    platformRole?: string | null;
+    brokerId?: string | null;
+    memberships?: BrokerMembership[];
+    isMailVerified?: boolean;
   };
 };
 

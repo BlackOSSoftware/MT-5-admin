@@ -17,21 +17,20 @@ export default function AdminLayout({
   const router = useRouter();
   const { isLoading, isError, error } = useAdminMe();
 
-  // 🔴 LOGOUT SIDE-EFFECT (SAFE)
+  // 🔴 LOGOUT / AUTH FAIL → login (never blank)
   useEffect(() => {
     if (!isError) return;
 
-    const status =
-      typeof error === "object" && error !== null
-        ? (error as { response?: { status?: number } }).response?.status
-        : undefined;
+    localStorage.removeItem("token");
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("platformRole");
+    localStorage.removeItem("brokerId");
+    localStorage.removeItem("memberships");
+    localStorage.removeItem("brandName");
+    document.cookie = "accessToken=; path=/; max-age=0";
+    document.title = "Admin Login";
 
-    if (status === 401) {
-      localStorage.removeItem("accessToken");
-      document.cookie = "accessToken=; path=/; max-age=0";
-
-      router.replace("/admin/login");
-    }
+    router.replace("/");
   }, [isError, error, router]);
 
   // ⏳ loading
@@ -43,9 +42,13 @@ export default function AdminLayout({
     );
   }
 
-  // ⛔ while redirecting → blank screen
+  // ⛔ auth failed — show redirect state (not blank)
   if (isError) {
-    return null;
+    return (
+      <div className="flex h-screen items-center justify-center text-sm text-[var(--text-muted)]">
+        Session expired. Redirecting to login…
+      </div>
+    );
   }
 
   // ✅ AUTH OK

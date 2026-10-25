@@ -33,6 +33,7 @@ import {
   Plus,
   RefreshCcw,
   Trash2,
+  UserPlus,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -50,10 +51,14 @@ interface NavItem {
 
 /* ================= NAV CONFIG ================= */
 
-const navSections: {
+function buildNavSections(isSuperAdmin: boolean): {
   title: string;
   items: NavItem[];
-}[] = [
+}[] {
+  const sections: {
+    title: string;
+    items: NavItem[];
+  }[] = [
     {
       title: "Core",
       items: [
@@ -62,6 +67,15 @@ const navSections: {
           label: "Dashboard",
           icon: <LayoutDashboard size={18} />,
         },
+        ...(isSuperAdmin
+          ? [
+              {
+                href: "/admin/create-admin",
+                label: "Admins",
+                icon: <UserPlus size={18} />,
+              },
+            ]
+          : []),
       ],
     },
     {
@@ -165,6 +179,9 @@ const navSections: {
     },
   ];
 
+  return sections;
+}
+
 /* ================= COMPONENT ================= */
 
 export default function AdminSidebar() {
@@ -175,6 +192,16 @@ export default function AdminSidebar() {
   const scrollTopRef = useRef(0);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [pinnedDropdown, setPinnedDropdown] = useState<string | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  useEffect(() => {
+    setIsSuperAdmin(localStorage.getItem("platformRole") === "SUPER_ADMIN");
+  }, []);
+
+  const navSections = useMemo(
+    () => buildNavSections(isSuperAdmin),
+    [isSuperAdmin],
+  );
 
   const normalize = (p: string) => p.replace(/\/+$/, "");
   const currentPath = normalize(pathname);

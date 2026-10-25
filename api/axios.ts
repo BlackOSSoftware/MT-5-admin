@@ -7,12 +7,19 @@ const api = axios.create({
     }, withCredentials: true, 
   });
 
-// 🔐 attach token automatically
+// 🔐 attach token + broker scope (Broker Admin only; SuperAdmin = no header = all data)
 api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
     const token = localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    const platformRole = localStorage.getItem("platformRole");
+    const brokerId = localStorage.getItem("brokerId");
+    if (platformRole !== "SUPER_ADMIN" && brokerId) {
+      config.headers["x-broker-id"] = brokerId;
+    } else if (config.headers?.["x-broker-id"]) {
+      delete config.headers["x-broker-id"];
     }
   }
   return config;
