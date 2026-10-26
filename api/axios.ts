@@ -1,11 +1,13 @@
 import axios from "axios";
 
-const api = axios.create({ 
-  baseURL: process.env.NEXT_PUBLIC_API_URL, 
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
   headers: {
-     "Content-Type": "application/json", 
-    }, withCredentials: true, 
-  });
+    "Content-Type": "application/json",
+  },
+  withCredentials: true,
+  timeout: 20000,
+});
 
 // 🔐 attach token + broker scope (Broker Admin only; SuperAdmin = no header = all data)
 api.interceptors.request.use((config) => {

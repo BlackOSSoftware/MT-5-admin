@@ -45,8 +45,24 @@ export default function AdminLayout({
   // ⛔ auth failed — show redirect state (not blank)
   if (isError) {
     return (
-      <div className="flex h-screen items-center justify-center text-sm text-[var(--text-muted)]">
-        Session expired. Redirecting to login…
+      <div className="flex h-screen flex-col items-center justify-center gap-3 text-sm text-[var(--text-muted)]">
+        <p>Session expired. Redirecting to login…</p>
+        <button
+          type="button"
+          className="rounded-md border border-[var(--card-border)] px-3 py-1.5 text-[var(--foreground)] hover:bg-[var(--hover-bg)]"
+          onClick={() => {
+            localStorage.removeItem("token");
+            localStorage.removeItem("accessToken");
+            localStorage.removeItem("platformRole");
+            localStorage.removeItem("brokerId");
+            localStorage.removeItem("memberships");
+            localStorage.removeItem("brandName");
+            document.cookie = "accessToken=; path=/; max-age=0";
+            router.replace("/");
+          }}
+        >
+          Go to login
+        </button>
       </div>
     );
   }

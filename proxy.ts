@@ -16,8 +16,8 @@ export function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL("/admin", req.url));
   }
 
-  // 🔁 Logged-in user should not see login/signup
-  if ((pathname === "/" || pathname === "/") && token) {
+  // 🔁 Logged-in user should not see login
+  if (pathname === "/" && token) {
     return NextResponse.redirect(new URL("/admin", req.url));
   }
 

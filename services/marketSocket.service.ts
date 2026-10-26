@@ -221,30 +221,10 @@ export function getMarketBySymbol(symbol: string): string {
   const normalized = normalizeSymbol(symbol);
   if (!normalized) return "crypto";
 
-  if (
-    normalized.startsWith("XAU") ||
-    normalized.startsWith("XAG") ||
-    normalized.startsWith("XPT") ||
-    normalized.startsWith("XPD") ||
-    normalized === "GOLD" ||
-    normalized === "SILVER"
-  ) {
-    return "metal";
-  }
-
-  if (normalized.endsWith("USDT")) return "crypto";
-
-  if (
-    normalized.endsWith("USD") ||
-    normalized.endsWith("JPY") ||
-    normalized.endsWith("EUR") ||
-    normalized.endsWith("GBP") ||
-    normalized.endsWith("AUD") ||
-    normalized.endsWith("CAD") ||
-    normalized.endsWith("CHF") ||
-    normalized.endsWith("NZD")
-  ) {
-    return "forex";
+  // Equities only → AllTick stock WS. Gold/forex/crypto use quote-b.
+  // Older backends mapped metal/forex → stock WS (seed on reload, no live GOLD ticks).
+  if (/\.(US|HK|SH|SZ)$/i.test(normalized)) {
+    return "stock";
   }
 
   return "crypto";
