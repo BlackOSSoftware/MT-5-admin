@@ -17,7 +17,22 @@ api.interceptors.request.use((config) => {
       config.headers.Authorization = `Bearer ${token}`;
     }
     const platformRole = localStorage.getItem("platformRole");
-    const brokerId = localStorage.getItem("brokerId");
+    let brokerId = localStorage.getItem("brokerId");
+    // Recover broker scope if login stored memberships but brokerId was cleared.
+    if (!brokerId && platformRole !== "SUPER_ADMIN") {
+      try {
+        const raw = localStorage.getItem("memberships");
+        const memberships = raw ? JSON.parse(raw) : [];
+        const first =
+          memberships?.[0]?.brokerId || memberships?.[0]?.broker?._id || "";
+        if (first) {
+          brokerId = String(first);
+          localStorage.setItem("brokerId", brokerId);
+        }
+      } catch {
+        // ignore bad memberships JSON
+      }
+    }
     if (platformRole !== "SUPER_ADMIN" && brokerId) {
       config.headers["x-broker-id"] = brokerId;
     } else if (config.headers?.["x-broker-id"]) {
