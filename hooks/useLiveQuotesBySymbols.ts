@@ -11,7 +11,9 @@ type QuoteMap = Record<string, QuoteLiveState>;
 
 const SYMBOL_ALIAS_MAP: Record<string, string> = {
     SILVER: "XAGUSD",
+    XAGUSD: "SILVER",
     GOLD: "XAUUSD",
+    XAUUSD: "GOLD",
 };
 
 function normalizeSymbol(value: string) {
@@ -36,10 +38,22 @@ function sameSymbol(a: string, b: string) {
     return Boolean(ca && cb && ca === cb);
 }
 
-function resolveFeedSymbol(value: string) {
-    const normalized = normalizeSymbol(value);
-    if (!normalized) return "";
-    return compactSymbol(SYMBOL_ALIAS_MAP[normalized] ?? normalized);
+/** AllTick metals use GOLD/Silver; UI often uses XAUUSD/XAGUSD — subscribe both. */
+function buildSubscribeSymbols(value: string): string[] {
+    const compact = compactSymbol(value);
+    if (!compact) return [];
+    const aliases = new Set<string>([compact]);
+    const mapped = SYMBOL_ALIAS_MAP[compact];
+    if (mapped) aliases.add(compactSymbol(mapped));
+    if (compact === "GOLD" || compact === "XAUUSD") {
+        aliases.add("GOLD");
+        aliases.add("XAUUSD");
+    }
+    if (compact === "SILVER" || compact === "XAGUSD") {
+        aliases.add("SILVER");
+        aliases.add("XAGUSD");
+    }
+    return Array.from(aliases);
 }
 
 export function useLiveQuotesBySymbols(
@@ -101,6 +115,9 @@ export function useLiveQuotesBySymbols(
                 aliases.forEach((alias) => keys.add(alias));
             }
         });
+
+        // Always mirror metal provider ↔ UI codes so ticks on GOLD update XAUUSD rows.
+        buildSubscribeSymbols(symbol).forEach((alias) => keys.add(alias));
 
         if (keys.size === 0 && compact) keys.add(compact);
         return Array.from(keys);
@@ -386,18 +403,27 @@ export function useLiveQuotesBySymbols(
         const normalizedSymbols = symbols
             .map((s) => normalizeSymbol(s))
             .filter(Boolean);
-        const feedSymbols = normalizedSymbols.map((s) => resolveFeedSymbol(s));
-        const nextFeed = new Set(feedSymbols);
+
+        const nextFeed = new Set<string>();
         const nextAliases = new Set(normalizedSymbols);
         const aliasesByFeed: Record<string, string[]> = {};
 
-        normalizedSymbols.forEach((displaySymbol, idx) => {
-            const feedSymbol = feedSymbols[idx];
-            if (!feedSymbol) return;
-            if (!aliasesByFeed[feedSymbol]) aliasesByFeed[feedSymbol] = [];
-            if (!aliasesByFeed[feedSymbol].includes(displaySymbol)) {
-                aliasesByFeed[feedSymbol].push(displaySymbol);
-            }
+        normalizedSymbols.forEach((displaySymbol) => {
+            const subscribeSymbols = buildSubscribeSymbols(displaySymbol);
+            subscribeSymbols.forEach((feedSymbol) => {
+                nextFeed.add(feedSymbol);
+                nextAliases.add(feedSymbol);
+                if (!aliasesByFeed[feedSymbol]) aliasesByFeed[feedSymbol] = [];
+                if (!aliasesByFeed[feedSymbol].includes(displaySymbol)) {
+                    aliasesByFeed[feedSymbol].push(displaySymbol);
+                }
+                // Cross-link metal aliases both ways for tick → row updates.
+                subscribeSymbols.forEach((alias) => {
+                    if (!aliasesByFeed[feedSymbol].includes(alias)) {
+                        aliasesByFeed[feedSymbol].push(alias);
+                    }
+                });
+            });
         });
 
         aliasesRef.current = aliasesByFeed;
