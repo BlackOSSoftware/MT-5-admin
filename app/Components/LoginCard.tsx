@@ -91,7 +91,9 @@ export default function AdminLogin() {
             axiosErr?.code === "ERR_NETWORK" ||
             axiosErr?.message === "Network Error"
           ) {
-            setErrorMsg("Backend unreachable. Is the API running on :4000?");
+            setErrorMsg(
+              "Backend unreachable. API is down or restarting — check mt5-backend (pm2)."
+            );
             return;
           }
           setErrorMsg(
