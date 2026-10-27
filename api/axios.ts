@@ -19,12 +19,16 @@ api.interceptors.request.use((config) => {
     const platformRole = localStorage.getItem("platformRole");
     let brokerId = localStorage.getItem("brokerId");
     // Recover broker scope if login stored memberships but brokerId was cleared.
+    // Broker admins MUST send x-broker-id or deposit/withdraw lists look empty / wrong.
     if (!brokerId && platformRole !== "SUPER_ADMIN") {
       try {
         const raw = localStorage.getItem("memberships");
         const memberships = raw ? JSON.parse(raw) : [];
         const first =
-          memberships?.[0]?.brokerId || memberships?.[0]?.broker?._id || "";
+          memberships?.[0]?.brokerId ||
+          memberships?.[0]?.broker?._id ||
+          memberships?.[0]?.broker?.id ||
+          "";
         if (first) {
           brokerId = String(first);
           localStorage.setItem("brokerId", brokerId);

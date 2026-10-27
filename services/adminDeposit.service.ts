@@ -77,7 +77,13 @@ function normalizeDepositListResponse(payload: unknown): AdminDepositsListPayloa
       : undefined) ??
     [];
 
+  const rootPagination =
+    root && typeof root === "object"
+      ? ((root as { pagination?: Record<string, unknown> }).pagination ?? null)
+      : null;
+
   const total =
+    asNumber(rootPagination?.total) ??
     asNumber((root as { total?: unknown })?.total) ??
     asNumber((node as { total?: unknown })?.total) ??
     asNumber((node as { pagination?: { total?: unknown } })?.pagination?.total) ??
@@ -86,16 +92,19 @@ function normalizeDepositListResponse(payload: unknown): AdminDepositsListPayloa
     listCandidate.length;
 
   const page =
+    asNumber(rootPagination?.page) ??
     asNumber((root as { page?: unknown })?.page) ??
     asNumber((node as { page?: unknown })?.page) ??
     asNumber((node as { pagination?: { page?: unknown } })?.pagination?.page);
 
   const limit =
+    asNumber(rootPagination?.limit) ??
     asNumber((root as { limit?: unknown })?.limit) ??
     asNumber((node as { limit?: unknown })?.limit) ??
     asNumber((node as { pagination?: { limit?: unknown } })?.pagination?.limit);
 
   const totalPages =
+    asNumber(rootPagination?.totalPages) ??
     asNumber((root as { totalPages?: unknown })?.totalPages) ??
     asNumber((node as { totalPages?: unknown })?.totalPages) ??
     asNumber((node as { pagination?: { totalPages?: unknown } })?.pagination?.totalPages);
