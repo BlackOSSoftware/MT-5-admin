@@ -141,6 +141,7 @@ function buildNavSections(isSuperAdmin: boolean): {
           icon: <CreditCard size={18} />,
           children: [
             { href: "/admin/transactions/bank-details", label: "Bank Details", icon: <DollarSign size={14} /> },
+            { href: "/admin/transactions/withdraw-methods", label: "Withdraw Methods", icon: <DollarSign size={14} /> },
             { href: "/admin/transactions/withdraw-request", label: "Withdraw Requests", icon: <DollarSign size={14} /> },
             { href: "/admin/transactions/all-deposit", label: "Deposit Requests", icon: <FileText size={14} /> },
             { href: "/admin/transactions/swap", label: "Swap Transactions", icon: <RefreshCcw size={14} /> },

@@ -63,8 +63,14 @@ type WithdrawalRow = {
   payout?: {
     upi_id?: string;
     bank_name?: string;
+    account_holder_name?: string;
     account_number?: string;
+    ifsc?: string;
+    swift_code?: string;
+    email?: string;
+    crypto_network?: string;
     crypto_address?: string;
+    note?: string;
   };
 };
 
@@ -299,7 +305,13 @@ export default function AllWithdrawals() {
                 <option value="">All methods</option>
                 <option value="UPI">UPI</option>
                 <option value="BANK">BANK</option>
+                <option value="INDIAN_BANK">INDIAN BANK</option>
+                <option value="NETELLER">NETELLER</option>
+                <option value="SKRILL">SKRILL</option>
+                <option value="USDT">USDT</option>
+                <option value="BITCOIN">BITCOIN</option>
                 <option value="CRYPTO">CRYPTO</option>
+                <option value="MANUAL">MANUAL</option>
               </select>
               <ChevronDown
                 size={16}
@@ -764,12 +776,24 @@ export default function AllWithdrawals() {
 
                   {(selected.payout?.upi_id ||
                     selected.payout?.bank_name ||
+                    selected.payout?.account_holder_name ||
                     selected.payout?.account_number ||
-                    selected.payout?.crypto_address) && (
+                    selected.payout?.ifsc ||
+                    selected.payout?.swift_code ||
+                    selected.payout?.email ||
+                    selected.payout?.crypto_network ||
+                    selected.payout?.crypto_address ||
+                    selected.payout?.note) && (
                     <div className="rounded-xl border border-[var(--card-border)] bg-[var(--input-bg)] p-3 sm:p-4 space-y-2">
                       <p className="text-xs font-medium text-[var(--text-muted)]">Payout Details</p>
                       {selected.payout?.upi_id && (
                         <p className="text-sm"><span className="font-semibold">UPI:</span> {selected.payout.upi_id}</p>
+                      )}
+                      {selected.payout?.email && (
+                        <p className="text-sm"><span className="font-semibold">Email:</span> {selected.payout.email}</p>
+                      )}
+                      {selected.payout?.account_holder_name && (
+                        <p className="text-sm"><span className="font-semibold">Holder:</span> {selected.payout.account_holder_name}</p>
                       )}
                       {selected.payout?.bank_name && (
                         <p className="text-sm"><span className="font-semibold">Bank:</span> {selected.payout.bank_name}</p>
@@ -777,8 +801,20 @@ export default function AllWithdrawals() {
                       {selected.payout?.account_number && (
                         <p className="text-sm"><span className="font-semibold">Account No:</span> {selected.payout.account_number}</p>
                       )}
+                      {selected.payout?.ifsc && (
+                        <p className="text-sm"><span className="font-semibold">IFSC:</span> {selected.payout.ifsc}</p>
+                      )}
+                      {selected.payout?.swift_code && (
+                        <p className="text-sm"><span className="font-semibold">SWIFT:</span> {selected.payout.swift_code}</p>
+                      )}
+                      {selected.payout?.crypto_network && (
+                        <p className="text-sm"><span className="font-semibold">Network:</span> {selected.payout.crypto_network}</p>
+                      )}
                       {selected.payout?.crypto_address && (
                         <p className="text-sm break-all"><span className="font-semibold">Wallet:</span> {selected.payout.crypto_address}</p>
+                      )}
+                      {selected.payout?.note && (
+                        <p className="text-sm"><span className="font-semibold">Note:</span> {selected.payout.note}</p>
                       )}
                     </div>
                   )}
