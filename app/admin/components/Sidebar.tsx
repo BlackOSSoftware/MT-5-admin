@@ -104,6 +104,11 @@ function buildNavSections(isSuperAdmin: boolean): {
               label: "Brokerage & Commission",
               icon: <DollarSign size={14} />,
             },
+            {
+              href: "/admin/risk-settings",
+              label: "Stop-out & Warnings",
+              icon: <Activity size={14} />,
+            },
           ],
         },
         { href: "/admin/account-plan", label: "Account Plans", icon: <Gift size={18} /> },
