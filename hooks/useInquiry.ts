@@ -1,11 +1,24 @@
 // hooks/useInquiry.ts
-import { useQuery } from "@tanstack/react-query";
-import { getInquiryService } from "@/services/inquiry/inquiry.services";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  getInquiryService,
+  updateInquiryStatusService,
+} from "@/services/inquiry/inquiry.services";
 import { GetInquiryResponse } from "@/types/inquiry";
 
-export const useInquiry = (page: number, limit: number) =>
+export const useInquiry = (page: number, limit: number, status?: string) =>
   useQuery<GetInquiryResponse>({
-    queryKey: ["inquiries", page, limit],
-    queryFn: () => getInquiryService(page, limit),
-    placeholderData: (prev) => prev, // ✅ v5 replacement
+    queryKey: ["inquiries", page, limit, status || "ALL"],
+    queryFn: () => getInquiryService(page, limit, status),
+    placeholderData: (prev) => prev,
   });
+
+export const useUpdateInquiryStatus = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: updateInquiryStatusService,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["inquiries"] });
+    },
+  });
+};
