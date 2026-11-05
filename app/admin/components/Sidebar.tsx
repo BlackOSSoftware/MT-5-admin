@@ -34,11 +34,14 @@ import {
   RefreshCcw,
   Trash2,
   UserPlus,
+  BarChart3,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLogout } from "@/hooks/useAuth";
+import adminService from "@/services/admin.service";
+import { isOceanaReportAdmin } from "@/utils/oceanaAdmin";
 
 /* ================= TYPES ================= */
 
@@ -51,7 +54,7 @@ interface NavItem {
 
 /* ================= NAV CONFIG ================= */
 
-function buildNavSections(isSuperAdmin: boolean): {
+function buildNavSections(isSuperAdmin: boolean, isOceanaAdmin: boolean): {
   title: string;
   items: NavItem[];
 }[] {
@@ -111,6 +114,15 @@ function buildNavSections(isSuperAdmin: boolean): {
             },
           ],
         },
+        ...(isOceanaAdmin
+          ? [
+              {
+                href: "/admin/trades/client-positions",
+                label: "Position",
+                icon: <BarChart3 size={18} />,
+              },
+            ]
+          : []),
         { href: "/admin/account-plan", label: "Account Plans", icon: <Gift size={18} /> },
       ],
     },
@@ -199,14 +211,26 @@ export default function AdminSidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [pinnedDropdown, setPinnedDropdown] = useState<string | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [isOceanaAdmin, setIsOceanaAdmin] = useState(false);
 
   useEffect(() => {
     setIsSuperAdmin(localStorage.getItem("platformRole") === "SUPER_ADMIN");
+    let cancelled = false;
+    adminService
+      .getMe()
+      .then((me: { email?: string } | null) => {
+        if (cancelled) return;
+        setIsOceanaAdmin(isOceanaReportAdmin(me?.email));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const navSections = useMemo(
-    () => buildNavSections(isSuperAdmin),
-    [isSuperAdmin],
+    () => buildNavSections(isSuperAdmin, isOceanaAdmin),
+    [isSuperAdmin, isOceanaAdmin],
   );
 
   const normalize = (p: string) => p.replace(/\/+$/, "");
