@@ -9,6 +9,7 @@ export type AdminUser = {
   createdAt: string;
   isOnline?: boolean;
   lastSeenAt?: string | null;
+  ibDashboardEnabled?: boolean;
 };
 
 export type UserListPagination = {
@@ -22,6 +23,8 @@ export type AdminUserListResponse = {
   success: boolean;
   data: AdminUser[];
   pagination: UserListPagination;
+  /** True only for the admin login allowed to enable client IB dashboards. */
+  ibToggleAllowed?: boolean;
 };
 
 export type UserListParams = {

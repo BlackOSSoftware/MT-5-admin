@@ -83,6 +83,17 @@ export async function updateAdminUser(
   return unwrapApi<AdminUserProfile>(data);
 }
 
+export async function setAdminUserIbDashboard(
+  userId: string,
+  enabled: boolean
+): Promise<{ _id: string; ibDashboardEnabled: boolean }> {
+  const { data } = await api.patch<ApiEnvelope<{ _id: string; ibDashboardEnabled: boolean }>>(
+    `/user/admin/${userId}/ib-dashboard`,
+    { enabled }
+  );
+  return unwrapApi(data);
+}
+
 export async function fetchAdminUserTransactions(
   userId: string,
   params: {
