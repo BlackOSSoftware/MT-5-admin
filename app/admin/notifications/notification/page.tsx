@@ -1,14 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
   Loader2,
+  ShieldCheck,
+  Users,
 } from "lucide-react";
 import { useGetAdminNotifications } from "@/hooks/notification/useGetAdminNotifications";
 import { useBroadcastNotification } from "@/hooks/notification/useBroadcastNotification";
 import Pagination from "../../components/ui/pagination";
-import { Notification, NotificationType } from "@/services/notification/notification.services";
+import {
+  Notification,
+  NotificationAudience,
+  NotificationType,
+} from "@/services/notification/notification.services";
 import GlobalLoader from "../../components/ui/GlobalLoader";
 import DragScroll from "../../components/ui/DragScroll";
 
@@ -21,7 +28,13 @@ interface TransformedNotification {
   isActive: boolean;
   expireAt: string;
   createdAt: string;
-  sentBy: string;
+  sentTo: string;
+}
+
+function audienceLabel(item: Notification) {
+  if (item.user_id) return item.user_id.email || item.user_id.name || "One user";
+  if (item.audience === "ADMINS") return item.brokerId ? "Broker admins" : "All admins";
+  return item.brokerId ? "Broker users" : "All users";
 }
 
 export default function NotificationsPage() {
@@ -40,7 +53,7 @@ export default function NotificationsPage() {
       _id: item._id,
       title: item.title,
       message: item.message,
-      type: item.data.type,
+      type: item.data?.type || "GENERAL",
       isActive: item.isActive,
       expireAt: new Date(item.expireAt).toLocaleDateString(),
       createdAt: new Date(item.createdAt).toLocaleString("en-IN", {
@@ -50,7 +63,7 @@ export default function NotificationsPage() {
         hour: "2-digit",
         minute: "2-digit",
       }),
-      sentBy: "Admin",
+      sentTo: audienceLabel(item),
     })
   );
 
@@ -110,12 +123,13 @@ export default function NotificationsPage() {
       {/* Responsive Table Card */}
       <div className="card-elevated overflow-hidden">
         <DragScroll className="overflow-x-auto scrollbar-thin scrollbar-thumb-[var(--text-muted)]/40 scrollbar-track-transparent">
-          <table className="table table-fixed min-w-[1100px] w-full">
+          <table className="table table-fixed min-w-[1270px] w-full">
             <thead>
               <tr>
                 <th className="w-[200px]">Title</th>
                 <th className="w-[300px]">Message</th>
                 <th className="w-[100px]">Type</th>
+                <th className="w-[170px]">Sent to</th>
                 <th className="w-[120px]">Status</th>
                 <th className="w-[140px]">Expires</th>
                 <th className="w-[200px]">Created</th>
@@ -124,7 +138,7 @@ export default function NotificationsPage() {
             <tbody>
               {filteredNotifications.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12">
+                  <td colSpan={7} className="text-center py-12">
                     <div className="space-y-2">
                       <div className="w-16 h-16 bg-[var(--hover-bg)] rounded-xl flex items-center justify-center mx-auto">
                         <svg className="w-7 h-7 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -154,6 +168,7 @@ export default function NotificationsPage() {
                         {notification.type}
                       </span>
                     </td>
+                    <td className="truncate text-sm text-[var(--text-muted)]">{notification.sentTo}</td>
                     <td className="whitespace-nowrap">
   <span
     className={`pill text-xs font-medium inline-flex items-center gap-1 ${
@@ -203,12 +218,19 @@ export default function NotificationsPage() {
 
 // Fully Custom Form Modal (same as before)
 function SendNotificationModal({ onClose }: { onClose: () => void }) {
+  const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
     title: "",
     message: "",
     type: "GENERAL" as NotificationType,
   });
+  const [audience, setAudience] = useState<NotificationAudience>("USERS");
+  // Modal only renders after a click, so localStorage is available here.
+  const [isSuperAdmin] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem("platformRole") === "SUPER_ADMIN",
+  );
   const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const broadcastMutation = useBroadcastNotification();
 
@@ -217,19 +239,23 @@ function SendNotificationModal({ onClose }: { onClose: () => void }) {
     if (!formData.title.trim() || !formData.message.trim()) return;
 
     setIsSending(true);
+    setError(null);
     const payload = {
       title: formData.title.trim(),
       message: formData.message.trim(),
       expireAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       data: { type: formData.type },
+      ...(isSuperAdmin ? { audience } : {}),
     };
 
     try {
       await broadcastMutation.mutateAsync(payload);
+      await queryClient.invalidateQueries({ queryKey: ["admin-notifications"] });
       onClose();
       setFormData({ title: "", message: "", type: "GENERAL" });
-    } catch (error) {
-      console.error("Send failed:", error);
+    } catch (err: unknown) {
+      const e2 = err as { response?: { data?: { message?: string } }; message?: string };
+      setError(e2?.response?.data?.message || e2?.message || "Failed to send notification");
     } finally {
       setIsSending(false);
     }
@@ -253,7 +279,45 @@ function SendNotificationModal({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[calc(90vh-80px)] overflow-y-auto">
+          {isSuperAdmin ? (
+            <div>
+              <p className="block text-sm font-semibold text-[var(--foreground)] mb-2">Send to</p>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { key: "USERS", label: "All users", hint: "Every broker's clients", icon: Users },
+                  { key: "ADMINS", label: "Admins only", hint: "Broker admin logins", icon: ShieldCheck },
+                ] as const).map(({ key, label, hint, icon: Icon }) => {
+                  const active = audience === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setAudience(key)}
+                      disabled={isSending}
+                      aria-pressed={active}
+                      className={`flex items-start gap-2 rounded-xl border p-3 text-left transition ${
+                        active
+                          ? "border-[var(--primary)] bg-[var(--primary)]/10 ring-2 ring-[var(--primary)]/20"
+                          : "border-[var(--card-border)] hover:bg-[var(--hover-bg)]"
+                      }`}
+                    >
+                      <Icon size={16} className={active ? "text-[var(--primary)]" : "text-[var(--text-muted)]"} />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-[var(--foreground)]">{label}</span>
+                        <span className="block text-[11px] text-[var(--text-muted)]">{hint}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <p className="rounded-xl border border-[var(--card-border)] bg-[var(--hover-bg)] px-3 py-2 text-xs text-[var(--text-muted)]">
+              This notification goes to your broker&apos;s clients only — web portal and mobile app.
+            </p>
+          )}
+
           <div>
             <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
               Title *
@@ -299,6 +363,10 @@ function SendNotificationModal({ onClose }: { onClose: () => void }) {
               <option value="HOLIDAY">Holiday</option>
             </select>
           </div>
+
+          {error ? (
+            <p className="rounded-lg bg-[var(--danger)]/10 px-3 py-2 text-xs text-[var(--danger)]">{error}</p>
+          ) : null}
 
           <div className="flex gap-3 pt-2">
             <button

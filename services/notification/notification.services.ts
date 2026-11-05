@@ -2,6 +2,8 @@ import api from "@/api/axios";
 
 export type NotificationType = "MAINTENANCE" | "HOLIDAY" | "GENERAL" | "INFORMATION";
 
+export type NotificationAudience = "USERS" | "ADMINS";
+
 export type Notification = {
   _id: string;
   title: string;
@@ -14,6 +16,9 @@ export type Notification = {
   createdAt: string;
   updatedAt: string;
   __v: number;
+  audience?: NotificationAudience;
+  brokerId?: string | null;
+  user_id?: { _id: string; email?: string; name?: string } | null;
 };
 
 export interface NotificationListResponse {
@@ -33,6 +38,8 @@ export type BroadcastNotificationPayload = {
   data: {
     type: NotificationType;
   };
+  /** Only honoured for SuperAdmin; broker admins always reach their own clients. */
+  audience?: NotificationAudience;
 };
 
 export async function broadcastNotificationService(
@@ -46,21 +53,12 @@ export async function getAdminNotificationsService(
   page: number = 1,
   limit: number = 10
 ): Promise<NotificationListResponse> {
-  const res = await api.get("/notification", {
+  // Broker-scoped on the backend (SuperAdmin sees every broker).
+  const res = await api.get("/notification/admin/list", {
     params: { page, limit },
   });
-  
-  // Transform API response to match expected structure
-  const apiData = res.data.data as Notification[];
-  const totalItems = apiData.length * 3; // Estimate based on your data
-  
   return {
-    list: apiData,
-    pagination: {
-      page,
-      limit,
-      totalPages: Math.ceil(totalItems / limit),
-      totalItems,
-    },
+    list: (res.data?.list ?? []) as Notification[],
+    pagination: res.data?.pagination ?? { page, limit, totalPages: 1, totalItems: 0 },
   };
 }
