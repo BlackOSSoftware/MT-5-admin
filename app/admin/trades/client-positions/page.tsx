@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
@@ -15,6 +15,7 @@ import {
   Search,
   ShieldAlert,
   ShieldCheck,
+  History,
   Trash2,
   X,
   XCircle,
@@ -29,15 +30,22 @@ import {
 import {
   closeTradeAdminPosition,
   deleteTradeAdminTrade,
+  getTradeAdminClosedTrades,
   modifyTradeAdminPosition,
 } from "@/services/tradeAdmin.service";
-import { isOceanaReportAdmin } from "@/utils/oceanaAdmin";
+import { canViewClientPositions } from "@/utils/adminPermissions";
 
 type Period = "today" | "7d" | "30d" | "mtd";
 type SideFilter = "ALL" | "BUY" | "SELL";
 type SlFilter = "ALL" | "WITH_SL" | "NO_SL";
 type SortKey = "lots_desc" | "lots_asc" | "profit_desc" | "loss_desc" | "risk_desc" | "newest";
 type PendingAction = { kind: "close" | "delete"; row: ClientPositionRow } | null;
+type ClosedView = {
+  symbol: string;
+  side?: "BUY" | "SELL";
+  pnl?: "profit" | "loss";
+  title: string;
+};
 
 /** Money lost if this SL is hit (0 when the SL locks in profit). */
 function riskAtSl(row: ClientPositionRow, sl: number) {
@@ -109,6 +117,8 @@ export default function ClientPositionsPage() {
   const [search, setSearch] = useState("");
   const [pending, setPending] = useState<PendingAction>(null);
   const [editing, setEditing] = useState<ClientPositionRow | null>(null);
+  const [closedView, setClosedView] = useState<ClosedView | null>(null);
+  const positionsRef = useRef<HTMLElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -116,9 +126,9 @@ export default function ClientPositionsPage() {
     let cancelled = false;
     adminService
       .getMe()
-      .then((me: { email?: string } | null) => {
+      .then((me: { platformRole?: string; permissions?: string[] } | null) => {
         if (!cancelled) {
-          setAllowed(isOceanaReportAdmin(me?.email));
+          setAllowed(canViewClientPositions(me));
         }
       })
       .catch(() => !cancelled && setAllowed(false));
@@ -168,6 +178,27 @@ export default function ClientPositionsPage() {
     return [...list].sort(sorters[sort]);
   }, [data, symbol, side, slFilter, sort, search]);
 
+  /** Long/Short/Avg cells → filter open positions to that script + side. */
+  const applyScriptSideFilter = (sym: string, s: "BUY" | "SELL") => {
+    setSymbol(sym);
+    setSide(s);
+    setSlFilter("ALL");
+    positionsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  /** Profit/Loss/Broker cells → open closed-trades drill-down for that script. */
+  const openClosedTrades = (
+    sym: string,
+    opts?: { side?: "BUY" | "SELL"; pnl?: "profit" | "loss"; title?: string },
+  ) => {
+    setClosedView({
+      symbol: sym,
+      side: opts?.side,
+      pnl: opts?.pnl,
+      title: opts?.title || `${sym} closed trades`,
+    });
+  };
+
   const runAction = async () => {
     if (!pending || busy) return;
     const { kind, row } = pending;
@@ -209,7 +240,7 @@ export default function ClientPositionsPage() {
           <ShieldAlert size={28} className="mx-auto text-amber-500" />
           <h1 className="mt-3 text-lg font-semibold">Access restricted</h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            The client position report is only available to the Oceana admin account.
+            You don&apos;t have permission to view the client position report. Ask a Super Admin to grant it.
           </p>
         </div>
       </div>
@@ -218,6 +249,8 @@ export default function ClientPositionsPage() {
 
   const totals = data?.totals;
   const scripts = data?.scripts ?? [];
+  const brokerProfitTotal = scripts.reduce((a, s) => a + (Number(s.brokerProfit) || 0), 0);
+  const brokerLossTotal = scripts.reduce((a, s) => a + (Number(s.brokerLoss) || 0), 0);
 
   return (
     <div className="container-pad max-w-full space-y-4 text-[var(--foreground)] sm:space-y-5">
@@ -262,7 +295,7 @@ export default function ClientPositionsPage() {
       ) : null}
 
       {/* METRICS */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <Metric label="Open positions" value={String(totals?.openPositions ?? 0)} icon={<Activity size={13} />} />
         <Metric label="Long lots" value={lots(totals?.longLots ?? 0)} icon={<ArrowUpRight size={13} />} tone="emerald" />
         <Metric label="Short lots" value={lots(totals?.shortLots ?? 0)} icon={<ArrowDownRight size={13} />} tone="rose" />
@@ -282,6 +315,20 @@ export default function ClientPositionsPage() {
           tone="indigo"
         />
         <Metric
+          label="Broker profit"
+          value={money(brokerProfitTotal)}
+          valueClass="text-emerald-600"
+          icon={<ArrowUpRight size={13} />}
+          tone="emerald"
+        />
+        <Metric
+          label="Broker loss"
+          value={money(brokerLossTotal)}
+          valueClass="text-rose-600"
+          icon={<ArrowDownRight size={13} />}
+          tone="rose"
+        />
+        <Metric
           label="Positions without SL"
           value={String(totals?.positionsWithoutSl ?? 0)}
           valueClass={(totals?.positionsWithoutSl ?? 0) > 0 ? "text-amber-600" : undefined}
@@ -295,7 +342,9 @@ export default function ClientPositionsPage() {
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--card-border)] px-4 py-3">
           <div>
             <h2 className="text-sm font-semibold">Scriptwise</h2>
-            <p className="text-[11px] text-[var(--text-muted)]">Click a script to see its positions below.</p>
+            <p className="text-[11px] text-[var(--text-muted)]">
+              Click a number to drill in — Long/Short filter open positions, Profit/Loss open closed trades.
+            </p>
           </div>
           {symbol ? (
             <button
@@ -308,7 +357,7 @@ export default function ClientPositionsPage() {
           ) : null}
         </div>
         <DragScroll className="overflow-x-auto">
-          <table className="w-full min-w-[1000px] text-sm">
+          <table className="w-full min-w-[1150px] text-sm">
             <thead className="bg-[var(--input-bg)] text-[11px] uppercase text-[var(--text-muted)]">
               <tr className="border-b border-[var(--card-border)]">
                 <th rowSpan={2} className="px-4 py-2 text-left align-bottom">Script</th>
@@ -316,10 +365,11 @@ export default function ClientPositionsPage() {
                 <GroupTh>Average</GroupTh>
                 <GroupTh>Close Positions</GroupTh>
                 <GroupTh>Net Position Broker</GroupTh>
+                <GroupTh>Broker Fees</GroupTh>
                 <th rowSpan={2} className="px-4 py-2 text-right align-bottom">Live Bid / Ask</th>
               </tr>
               <tr>
-                {["Long", "Short", "Long Avg", "Short Avg", "Profit", "Loss", "Profit", "Loss"].map((h, i) => (
+                {["Long", "Short", "Long Avg", "Short Avg", "Profit", "Loss", "Profit", "Loss", "Comm.", "Spread"].map((h, i) => (
                   <th key={`${h}-${i}`} className={`px-4 py-2 text-right font-semibold ${i % 2 === 0 ? "border-l border-[var(--card-border)]" : ""}`}>
                     {h}
                   </th>
@@ -329,13 +379,13 @@ export default function ClientPositionsPage() {
             <tbody>
               {report.isLoading ? (
                 <tr>
-                  <td colSpan={10} className="py-10 text-center text-[var(--text-muted)]">
+                  <td colSpan={12} className="py-10 text-center text-[var(--text-muted)]">
                     <Loader2 size={18} className="mx-auto animate-spin" />
                   </td>
                 </tr>
               ) : scripts.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-10 text-center text-sm text-[var(--text-muted)]">
+                  <td colSpan={12} className="py-10 text-center text-sm text-[var(--text-muted)]">
                     No client positions for this period.
                   </td>
                 </tr>
@@ -357,16 +407,93 @@ export default function ClientPositionsPage() {
                           {lots(s.netLots)}
                         </p>
                       </td>
-                      <Num className="border-l border-[var(--card-border)] text-emerald-600">{lots(s.longLots)}</Num>
-                      <Num className="text-rose-600">{lots(s.shortLots)}</Num>
-                      <Num className="border-l border-[var(--card-border)]">{fmtPrice(s.longAvg)}</Num>
-                      <Num>{fmtPrice(s.shortAvg)}</Num>
-                      <Num className="border-l border-[var(--card-border)] text-emerald-600">{money(s.closedProfit)}</Num>
-                      <Num className="text-rose-600">{money(s.closedLoss)}</Num>
-                      <Num className="border-l border-[var(--card-border)] font-semibold text-emerald-600">
+                      <DrillNum
+                        className="border-l border-[var(--card-border)] text-emerald-600"
+                        title="Show open Long positions for this script"
+                        onClick={() => applyScriptSideFilter(s.symbol, "BUY")}
+                      >
+                        {lots(s.longLots)}
+                      </DrillNum>
+                      <DrillNum
+                        className="text-rose-600"
+                        title="Show open Short positions for this script"
+                        onClick={() => applyScriptSideFilter(s.symbol, "SELL")}
+                      >
+                        {lots(s.shortLots)}
+                      </DrillNum>
+                      <DrillNum
+                        className="border-l border-[var(--card-border)]"
+                        title="Long average price — show Long positions"
+                        onClick={() => applyScriptSideFilter(s.symbol, "BUY")}
+                      >
+                        {fmtPrice(s.longAvg)}
+                      </DrillNum>
+                      <DrillNum
+                        title="Short average price — show Short positions"
+                        onClick={() => applyScriptSideFilter(s.symbol, "SELL")}
+                      >
+                        {fmtPrice(s.shortAvg)}
+                      </DrillNum>
+                      <DrillNum
+                        className="border-l border-[var(--card-border)] text-emerald-600"
+                        title="Winning closed trades — click to view"
+                        onClick={() =>
+                          openClosedTrades(s.symbol, {
+                            pnl: "profit",
+                            title: `${s.symbol} · winning closed trades`,
+                          })
+                        }
+                      >
+                        {money(s.closedProfit)}
+                      </DrillNum>
+                      <DrillNum
+                        className="text-rose-600"
+                        title="Losing closed trades — click to view"
+                        onClick={() =>
+                          openClosedTrades(s.symbol, {
+                            pnl: "loss",
+                            title: `${s.symbol} · losing closed trades`,
+                          })
+                        }
+                      >
+                        {money(s.closedLoss)}
+                      </DrillNum>
+                      <DrillNum
+                        className="border-l border-[var(--card-border)] font-semibold text-emerald-600"
+                        title="Broker profit — view the closed trades behind it"
+                        onClick={() =>
+                          openClosedTrades(s.symbol, {
+                            title: `${s.symbol} · closed trades (broker side)`,
+                          })
+                        }
+                      >
                         {s.brokerProfit > 0 ? money(s.brokerProfit) : "--"}
+                      </DrillNum>
+                      <DrillNum
+                        className="font-semibold text-rose-600"
+                        title="Broker loss — view the closed trades behind it"
+                        onClick={() =>
+                          openClosedTrades(s.symbol, {
+                            title: `${s.symbol} · closed trades (broker side)`,
+                          })
+                        }
+                      >
+                        {s.brokerLoss > 0 ? money(s.brokerLoss) : "--"}
+                      </DrillNum>
+                      <DrillNum
+                        className="border-l border-[var(--card-border)] font-semibold text-indigo-600"
+                        title="Commission earned from clients — click to view closed trades"
+                        onClick={() =>
+                          openClosedTrades(s.symbol, {
+                            title: `${s.symbol} · closed trades (broker side)`,
+                          })
+                        }
+                      >
+                        {s.commission > 0 ? money(s.commission) : "--"}
+                      </DrillNum>
+                      <Num className="text-[var(--text-muted)]" title="Average spread in points">
+                        {s.spreadAvg != null ? `${s.spreadAvg} pts` : "--"}
                       </Num>
-                      <Num className="font-semibold text-rose-600">{s.brokerLoss > 0 ? money(s.brokerLoss) : "--"}</Num>
                       <Num className="text-[var(--text-muted)]">
                         {fmtPrice(s.bid)} / {fmtPrice(s.ask)}
                       </Num>
@@ -379,12 +506,13 @@ export default function ClientPositionsPage() {
         </DragScroll>
         <p className="border-t border-[var(--card-border)] px-4 py-2 text-[11px] text-[var(--text-muted)]">
           Close Positions = client realised P/L in the selected period. Net Position Broker = broker side of client
-          floating + closed P/L (client profit is broker loss).
+          floating + closed P/L + commission (client profit is broker loss). Spread = volume-weighted average in
+          points; Comm. = total commission charged to clients.
         </p>
       </section>
 
       {/* POSITIONS */}
-      <section className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)]">
+      <section ref={positionsRef} className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] scroll-mt-4">
         <div className="flex flex-col gap-3 border-b border-[var(--card-border)] px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <h2 className="text-sm font-semibold">
@@ -394,6 +522,40 @@ export default function ClientPositionsPage() {
             <p className="text-[11px] text-[var(--text-muted)]">
               Risk % = loss if the stop loss is hit ÷ account equity.
             </p>
+            {(symbol || side !== "ALL" || slFilter !== "ALL" || search.trim()) ? (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {symbol ? (
+                  <FilterChip label={`Script: ${symbol}`} onClear={() => setSymbol(null)} />
+                ) : null}
+                {side !== "ALL" ? (
+                  <FilterChip
+                    label={`Side: ${side === "BUY" ? "Long" : "Short"}`}
+                    onClear={() => setSide("ALL")}
+                  />
+                ) : null}
+                {slFilter !== "ALL" ? (
+                  <FilterChip
+                    label={slFilter === "WITH_SL" ? "With SL" : "No SL"}
+                    onClear={() => setSlFilter("ALL")}
+                  />
+                ) : null}
+                {search.trim() ? (
+                  <FilterChip label={`Search: “${search.trim()}”`} onClear={() => setSearch("")} />
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSymbol(null);
+                    setSide("ALL");
+                    setSlFilter("ALL");
+                    setSearch("");
+                  }}
+                  className="text-[11px] font-semibold text-[var(--primary)] hover:underline"
+                >
+                  Clear all
+                </button>
+              </div>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
@@ -551,6 +713,10 @@ export default function ClientPositionsPage() {
           }}
           onError={(text) => setNotice({ type: "error", text })}
         />
+      ) : null}
+
+      {closedView ? (
+        <ClosedTradesModal view={closedView} from={from} onClose={() => setClosedView(null)} />
       ) : null}
 
       {pending ? (
@@ -921,8 +1087,209 @@ function GroupTh({ children }: { children: ReactNode }) {
   );
 }
 
-function Num({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <td className={`whitespace-nowrap px-4 py-3 text-right font-mono tabular-nums ${className}`}>{children}</td>;
+function Num({ children, className = "", title }: { children: ReactNode; className?: string; title?: string }) {
+  return (
+    <td className={`whitespace-nowrap px-4 py-3 text-right font-mono tabular-nums ${className}`} title={title}>
+      {children}
+    </td>
+  );
+}
+
+/** Clickable table cell — drills into a filtered view without triggering the row click. */
+function DrillNum({
+  children,
+  className = "",
+  title,
+  onClick,
+}: {
+  children: ReactNode;
+  className?: string;
+  title: string;
+  onClick: () => void;
+}) {
+  return (
+    <td className={`whitespace-nowrap px-4 py-3 text-right font-mono tabular-nums ${className}`}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        title={title}
+        className="cursor-pointer rounded px-1 py-0.5 underline-offset-2 transition hover:bg-[var(--hover-bg)] hover:underline"
+      >
+        {children}
+      </button>
+    </td>
+  );
+}
+
+function FilterChip({ label, onClear }: { label: string; onClear: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-[var(--card-border)] bg-[var(--input-bg)] px-2.5 py-1 text-[11px] font-medium">
+      {label}
+      <button
+        type="button"
+        onClick={onClear}
+        aria-label={`Clear ${label}`}
+        className="rounded-full p-0.5 text-[var(--text-muted)] hover:bg-[var(--hover-bg)] hover:text-[var(--foreground)]"
+      >
+        <X size={11} />
+      </button>
+    </span>
+  );
+}
+
+/** Closed-trades drill-down opened from the Scriptwise Profit/Loss/Broker cells. */
+function ClosedTradesModal({
+  view,
+  from,
+  onClose,
+}: {
+  view: ClosedView;
+  from: string;
+  onClose: () => void;
+}) {
+  const [page, setPage] = useState(1);
+  const to = useMemo(() => new Date().toISOString(), []);
+  const query = useQuery({
+    queryKey: ["closed-trades-drill", view.symbol, view.side ?? "", view.pnl ?? "", from, page],
+    queryFn: () =>
+      getTradeAdminClosedTrades({
+        page,
+        limit: 20,
+        symbol: view.symbol,
+        side: view.side,
+        pnl: view.pnl,
+        from,
+        to,
+        sortBy: "closeTime",
+        sortDir: "desc",
+      }),
+  });
+
+  const trades = query.data?.data ?? [];
+  const pagination = query.data?.pagination;
+  const filterLabel = [
+    view.symbol,
+    view.side ? (view.side === "BUY" ? "Long" : "Short") : null,
+    view.pnl === "profit" ? "Winning only" : view.pnl === "loss" ? "Losing only" : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-black/40" />
+      <div className="relative flex max-h-[85vh] w-full max-w-4xl flex-col rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] shadow-2xl">
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--card-border)] px-5 py-4">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 grid h-9 w-9 place-items-center rounded-xl bg-indigo-500/10 text-indigo-600">
+              <History size={16} />
+            </span>
+            <div>
+              <h3 className="text-base font-semibold">{view.title}</h3>
+              <p className="text-xs text-[var(--text-muted)]">
+                {filterLabel} · client realised P/L — the broker earns the opposite.
+              </p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close" className="rounded-lg p-1 hover:bg-[var(--hover-bg)]">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-auto">
+          <table className="w-full min-w-[760px] text-sm">
+            <thead className="sticky top-0 bg-[var(--input-bg)] text-[11px] uppercase text-[var(--text-muted)]">
+              <tr className="border-b border-[var(--card-border)]">
+                {["Client", "Side", "Lots", "Open → Close", "P/L", "Closed"].map((h) => (
+                  <th key={h} className="px-4 py-2.5 text-left font-semibold">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {query.isLoading ? (
+                <tr>
+                  <td colSpan={6} className="py-10 text-center text-[var(--text-muted)]">
+                    <Loader2 size={18} className="mx-auto animate-spin" />
+                  </td>
+                </tr>
+              ) : query.isError ? (
+                <tr>
+                  <td colSpan={6} className="py-10 text-center text-sm text-rose-600">
+                    {(query.error as Error)?.message || "Failed to load closed trades"}
+                  </td>
+                </tr>
+              ) : trades.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-10 text-center text-sm text-[var(--text-muted)]">
+                    No closed trades match this filter.
+                  </td>
+                </tr>
+              ) : (
+                trades.map((t) => (
+                  <tr key={t._id} className="border-t border-[var(--card-border)] hover:bg-[var(--hover-bg)]">
+                    <td className="px-4 py-2.5">
+                      <p className="font-medium">{t.userName || t.userEmail || "--"}</p>
+                      <p className="text-[11px] text-[var(--text-muted)]">#{t.accountNumber || "--"}</p>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span
+                        className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-bold ${
+                          t.side === "BUY"
+                            ? "bg-emerald-500/10 text-emerald-600"
+                            : "bg-rose-500/10 text-rose-600"
+                        }`}
+                      >
+                        {t.side === "BUY" ? "Long" : "Short"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 font-mono tabular-nums">{lots(t.volume)}</td>
+                    <td className="px-4 py-2.5 font-mono tabular-nums text-xs">
+                      {fmtPrice(t.openPrice)} → {fmtPrice(t.closePrice)}
+                    </td>
+                    <td className={`px-4 py-2.5 text-right font-mono font-semibold tabular-nums ${pnlClass(t.realizedPnL)}`}>
+                      {money(t.realizedPnL)}
+                    </td>
+                    <td className="px-4 py-2.5 text-xs text-[var(--text-muted)]">{formatTime(t.closeTime || "")}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {pagination && pagination.totalPages > 1 ? (
+          <div className="flex items-center justify-between border-t border-[var(--card-border)] px-5 py-3 text-xs text-[var(--text-muted)]">
+            <span>
+              Page {pagination.page} of {pagination.totalPages} · {pagination.total} trades
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="rounded-lg border border-[var(--card-border)] px-3 py-1.5 font-medium hover:bg-[var(--hover-bg)] disabled:opacity-40"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                disabled={page >= pagination.totalPages}
+                onClick={() => setPage((p) => p + 1)}
+                className="rounded-lg border border-[var(--card-border)] px-3 py-1.5 font-medium hover:bg-[var(--hover-bg)] disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 function Metric({

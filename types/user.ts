@@ -10,6 +10,7 @@ export type AdminUser = {
   isOnline?: boolean;
   lastSeenAt?: string | null;
   ibDashboardEnabled?: boolean;
+  broker?: { _id: string; displayName: string; code: string } | null;
 };
 
 export type UserListPagination = {

@@ -8,6 +8,7 @@ import AdminSidebar from "./components/Sidebar";
 import { ClickSoundProvider } from "./components/ClickSoundProvider";
 import { useAdminMe } from "@/hooks/useAdmin";
 import GlobalLoader from "./components/ui/GlobalLoader";
+import CustomCursor from "./components/CustomCursor";
 
 export default function AdminLayout({
   children,
@@ -72,6 +73,7 @@ export default function AdminLayout({
     <ClickSoundProvider>
       <div className="min-h-screen flex flex-col text-[var(--foreground)] bg-[var(--background)]">
         <Topbar />
+        <CustomCursor />
 
         <div className="flex min-w-0 flex-1">
           <AdminSidebar />

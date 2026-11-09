@@ -56,6 +56,9 @@ export default function UsersPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [openFilter, setOpenFilter] = useState<FilterKey | null>(null);
+  const [isSuperAdmin] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem("platformRole") === "SUPER_ADMIN"
+  );
 
   const kycOptions: Array<{ value: KycFilter; label: string; dot: string }> = [
     { value: "ALL", label: "All KYC", dot: "bg-slate-300" },
@@ -107,7 +110,7 @@ export default function UsersPage() {
   const users = listQuery.data?.data ?? EMPTY_USERS;
   const pagination = listQuery.data?.pagination;
   const ibToggleAllowed = Boolean(listQuery.data?.ibToggleAllowed);
-  const colCount = ibToggleAllowed ? 10 : 9;
+  const colCount = (ibToggleAllowed ? 10 : 9) + (isSuperAdmin ? 1 : 0);
   const totalPages = pagination?.totalPages ?? 1;
   const total = pagination?.total ?? users.length;
   const isInitialLoading = listQuery.isLoading && !listQuery.data;
@@ -358,7 +361,7 @@ export default function UsersPage() {
         </div>
 
         <DragScroll className="overflow-x-auto">
-          <table className={`w-full text-left text-sm ${ibToggleAllowed ? "min-w-[1100px]" : "min-w-[980px]"}`}>
+          <table className={`w-full text-left text-sm ${ibToggleAllowed ? "min-w-[1100px]" : "min-w-[980px]"} ${isSuperAdmin ? "min-w-[1200px]" : ""}`}>
             <thead className="bg-[var(--input-bg)] text-[var(--text-muted)] text-xs uppercase">
               <tr>
                 <th className="px-4 py-3">#</th>
@@ -367,6 +370,7 @@ export default function UsersPage() {
                 <th className="px-4 py-3">Email</th>
                 <th className="px-4 py-3">Phone</th>
                 <th className="px-4 py-3">User Type</th>
+                {isSuperAdmin && <th className="px-4 py-3">Admin / Broker</th>}
                 <th className="px-4 py-3">Mail</th>
                 <th className="px-4 py-3">KYC</th>
                 {ibToggleAllowed && <th className="px-4 py-3">IB Dashboard</th>}
@@ -424,6 +428,20 @@ export default function UsersPage() {
                     <td className="px-4 py-3">{u.email || "--"}</td>
                     <td className="px-4 py-3">{u.phone || "--"}</td>
                     <td className="px-4 py-3">{u.userType || "--"}</td>
+                    {isSuperAdmin && (
+                      <td className="px-4 py-3">
+                        {u.broker ? (
+                          <div className="flex flex-col">
+                            <span className="font-medium">{u.broker.displayName || "--"}</span>
+                            {u.broker.code ? (
+                              <span className="text-[11px] text-[var(--text-muted)]">{u.broker.code}</span>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="text-[var(--text-muted)]">--</span>
+                        )}
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${

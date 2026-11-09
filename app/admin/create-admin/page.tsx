@@ -29,6 +29,7 @@ const PERM_LABELS: Record<string, string> = {
   "settings.referral": "Referral settings",
   "admins.manage": "Manage staff",
   "reports.export": "Export reports",
+  "reports.client_positions": "Client position report",
 };
 
 function permLabel(key: string) {

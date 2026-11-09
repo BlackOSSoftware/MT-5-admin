@@ -418,6 +418,39 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 }
 
 /* ======================================================
+   CUSTOM CURSOR (admin panel)
+====================================================== */
+
+.custom-cursor {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 99999;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  will-change: transform;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+}
+
+.custom-cursor__icon {
+  display: none;
+  transform: translate(-2px, -2px);
+}
+
+.custom-cursor[data-variant="default"] .custom-cursor__icon--default,
+.custom-cursor[data-variant="pointer"] .custom-cursor__icon--pointer,
+.custom-cursor[data-variant="text"] .custom-cursor__icon--text {
+  display: block;
+}
+
+/* Hide the native cursor only while the custom cursor is active (fine pointers). */
+html.custom-cursor-enabled,
+html.custom-cursor-enabled * {
+  cursor: none !important;
+}
+
+/* ======================================================
    RESPONSIVE
 ====================================================== */
 

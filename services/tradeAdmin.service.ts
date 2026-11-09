@@ -124,6 +124,7 @@ export type TradeAdminClosedTradesParams = {
   timeField?: TradeTimeField;
   sortBy?: TradeTimeField;
   sortDir?: TradeSortDir;
+  pnl?: "profit" | "loss";
 };
 
 export type TradeAdminOpenTrade = {
@@ -396,6 +397,7 @@ export const getTradeAdminClosedTrades = async (
   if (params.timeField) query.timeField = params.timeField;
   if (params.sortBy) query.sortBy = params.sortBy;
   if (params.sortDir) query.sortDir = params.sortDir;
+  if (params.pnl) query.pnl = params.pnl;
 
   const res = await api.get("/trade-admin/trades/closed", { params: query });
   return res.data as TradeAdminClosedTradesResponse;

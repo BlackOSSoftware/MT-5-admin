@@ -4,6 +4,7 @@ import { Moon, Sun, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useClickSoundSettings } from "./ClickSoundProvider";
 import { applyDocumentTitle } from "@/utils/brand";
+import adminService from "@/services/admin.service";
 
 export default function Topbar() {
   const { enabled: clickSoundEnabled, toggle: toggleClickSound } =
@@ -12,8 +13,27 @@ export default function Topbar() {
     if (typeof window === "undefined") return "light";
     return localStorage.theme === "dark" ? "dark" : "light";
   });
+  const [me, setMe] = useState<{
+    name?: string;
+    email?: string;
+    platformRole?: string;
+    brokerDisplayName?: string;
+  } | null>(null);
 
   const brandName = "Admin";
+
+  useEffect(() => {
+    let cancelled = false;
+    adminService
+      .getMe()
+      .then((data: typeof me) => {
+        if (!cancelled && data) setMe(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -36,8 +56,12 @@ export default function Topbar() {
     setTheme((prev) => (prev === "light" ? "dark" : "light"));
   };
 
-  const line1 = brandName;
-  const line2 = "ADMIN";
+  const line1 = me?.name || me?.email || brandName;
+  const line2 = me?.platformRole === "SUPER_ADMIN"
+    ? "SUPER ADMIN"
+    : me?.brokerDisplayName
+      ? `${me.brokerDisplayName.toUpperCase()} · ADMIN`
+      : "ADMIN";
 
   return (
     <header className="w-full sticky top-0 z-50 border-b border-[var(--card-border)] bg-[var(--card-bg)]">

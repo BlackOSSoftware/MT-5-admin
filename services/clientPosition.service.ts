@@ -19,6 +19,8 @@ export type ClientPositionScript = {
   brokerProfit: number;
   brokerLoss: number;
   brokerNet: number;
+  commission: number;
+  spreadAvg: number | null;
 };
 
 export type ClientPositionRow = {
@@ -59,6 +61,7 @@ export type ClientPositionReport = {
     closedProfit: number;
     closedLoss: number;
     brokerNet: number;
+    commission: number;
     positionsWithoutSl: number;
   };
   scripts: ClientPositionScript[];

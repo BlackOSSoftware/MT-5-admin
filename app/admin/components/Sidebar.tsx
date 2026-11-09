@@ -41,7 +41,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLogout } from "@/hooks/useAuth";
 import adminService from "@/services/admin.service";
-import { isOceanaReportAdmin } from "@/utils/oceanaAdmin";
+import { canViewClientPositions } from "@/utils/adminPermissions";
 
 /* ================= TYPES ================= */
 
@@ -54,7 +54,7 @@ interface NavItem {
 
 /* ================= NAV CONFIG ================= */
 
-function buildNavSections(isSuperAdmin: boolean, isOceanaAdmin: boolean): {
+function buildNavSections(isSuperAdmin: boolean, canViewPositions: boolean): {
   title: string;
   items: NavItem[];
 }[] {
@@ -114,7 +114,7 @@ function buildNavSections(isSuperAdmin: boolean, isOceanaAdmin: boolean): {
             },
           ],
         },
-        ...(isOceanaAdmin
+        ...(canViewPositions
           ? [
               {
                 href: "/admin/trades/client-positions",
@@ -211,16 +211,29 @@ export default function AdminSidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [pinnedDropdown, setPinnedDropdown] = useState<string | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [isOceanaAdmin, setIsOceanaAdmin] = useState(false);
+  const [canViewPositions, setCanViewPositions] = useState(false);
+  const [me, setMe] = useState<{
+    name?: string;
+    email?: string;
+    platformRole?: string;
+    brokerDisplayName?: string;
+  } | null>(null);
 
   useEffect(() => {
     setIsSuperAdmin(localStorage.getItem("platformRole") === "SUPER_ADMIN");
     let cancelled = false;
     adminService
       .getMe()
-      .then((me: { email?: string } | null) => {
-        if (cancelled) return;
-        setIsOceanaAdmin(isOceanaReportAdmin(me?.email));
+      .then((data: {
+        name?: string;
+        email?: string;
+        platformRole?: string;
+        brokerDisplayName?: string;
+        permissions?: string[];
+      } | null) => {
+        if (cancelled || !data) return;
+        setMe(data);
+        setCanViewPositions(canViewClientPositions(data));
       })
       .catch(() => {});
     return () => {
@@ -229,8 +242,8 @@ export default function AdminSidebar() {
   }, []);
 
   const navSections = useMemo(
-    () => buildNavSections(isSuperAdmin, isOceanaAdmin),
-    [isSuperAdmin, isOceanaAdmin],
+    () => buildNavSections(isSuperAdmin, canViewPositions),
+    [isSuperAdmin, canViewPositions],
   );
 
   const normalize = (p: string) => p.replace(/\/+$/, "");
@@ -302,7 +315,29 @@ export default function AdminSidebar() {
   const renderSidebarInner = () => (
     <div className="flex h-full flex-col px-4 py-5 text-sm">
 
-      {/* LOGO / TITLE REMOVED */}
+      {/* ADMIN PROFILE */}
+      {/* <div className="mb-4 flex items-center gap-3 rounded-xl border border-[var(--card-border)] bg-[var(--input-bg)] px-3 py-2.5">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--primary)] text-xs font-bold text-white">
+          {(me?.name || me?.email || "A")
+            .split(" ")
+            .map((w) => w[0])
+            .slice(0, 2)
+            .join("")
+            .toUpperCase()}
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-[var(--foreground)]">
+            {me?.name || me?.email || "Admin"}
+          </p>
+          <p className="truncate text-[11px] text-[var(--text-muted)]">
+            {isSuperAdmin
+              ? "Super Admin"
+              : me?.brokerDisplayName
+                ? `${me.brokerDisplayName} · Admin`
+                : "Admin"}
+          </p>
+        </div>
+      </div> */}
 
       {/* NAV */}
       <div
