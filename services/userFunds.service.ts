@@ -9,6 +9,8 @@ export type TradeAdminUserFundsItem = {
   userType?: "USER" | "ADMIN" | string;
   isMailVerified?: boolean;
   kycStatus?: string;
+  wallet_balance?: number;
+  wallet_hold_balance?: number;
   accountsCount?: number;
   totalBalance?: number;
   totalHoldBalance?: number;

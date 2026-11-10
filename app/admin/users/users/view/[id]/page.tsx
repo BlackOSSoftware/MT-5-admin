@@ -38,6 +38,7 @@ import {
   Hash,
   Building2,
   XCircle,
+  Wallet,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Modal from "@/app/admin/components/ui/Modal";
@@ -2127,7 +2128,28 @@ export default function UserViewPage() {
         )}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
+            <Wallet size={14} /> Wallet balance
+          </div>
+          <p className="mt-2 text-2xl font-semibold tabular-nums text-sky-600">
+            $
+            {formatAmount(
+              Math.max(
+                0,
+                Number(userQuery.data?.wallet_balance || 0) -
+                  Number(userQuery.data?.wallet_hold_balance || 0)
+              )
+            )}
+          </p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Total ${formatAmount(Number(userQuery.data?.wallet_balance || 0))}
+            {Number(userQuery.data?.wallet_hold_balance || 0) > 0
+              ? ` · Hold $${formatAmount(Number(userQuery.data?.wallet_hold_balance || 0))}`
+              : ""}
+          </p>
+        </div>
         <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
           <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
             <Users size={14} /> Direct referrals

@@ -176,6 +176,7 @@ export default function UserFundsPage() {
       "Mail Verified",
       "KYC Status",
       "Accounts",
+      "Wallet",
       "Total Balance",
       "Hold Balance",
       "Free Balance",
@@ -193,6 +194,11 @@ export default function UserFundsPage() {
         : "--",
       row.kycStatus ?? "--",
       getFundsValue(row, "accountsCount") ?? "--",
+      (() => {
+        const wb = Number(row.wallet_balance || 0);
+        const wh = Number(row.wallet_hold_balance || 0);
+        return Math.max(0, wb - wh);
+      })(),
       getFundsValue(row, "totalBalance") ?? "--",
       getFundsValue(row, "totalHoldBalance") ?? "--",
       getFundsValue(row, "totalFreeBalance") ?? "--",
@@ -411,6 +417,7 @@ export default function UserFundsPage() {
                   <th className="px-4 py-3">Mail</th>
                   <th className="px-4 py-3">KYC</th>
                   <th className="px-4 py-3">Accounts</th>
+                  <th className="px-4 py-3">Wallet</th>
                   <th className="px-4 py-3">Balance</th>
                   <th className="px-4 py-3">Hold Balance</th>
                   <th className="px-4 py-3">Free Balance</th>
@@ -573,6 +580,15 @@ function UserFundsRow({ row }: { row: TradeAdminUserFundsItem }) {
         </span>
       </td>
       <td className="px-4 py-3">{getFundsValue(row, "accountsCount") ?? "--"}</td>
+      <td className="px-4 py-3">
+        {formatNumber(
+          Math.max(
+            0,
+            Number(row.wallet_balance || 0) -
+              Number(row.wallet_hold_balance || 0)
+          )
+        )}
+      </td>
       <td className="px-4 py-3">
         {formatNumber(Number(getFundsValue(row, "totalBalance")))}
       </td>

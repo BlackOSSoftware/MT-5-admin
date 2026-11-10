@@ -44,6 +44,8 @@ export type AdminUserProfile = {
   userType?: string;
   isMailVerified?: boolean;
   kycStatus?: string;
+  wallet_balance?: number;
+  wallet_hold_balance?: number;
   createdAt?: string;
   isOnline?: boolean;
   lastSeenAt?: string | null;
