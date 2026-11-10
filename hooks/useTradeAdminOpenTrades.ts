@@ -22,9 +22,12 @@ export const useTradeAdminOpenTrades = (params: TradeAdminOpenTradesParams) =>
       params.timeField ?? "",
       params.sortBy ?? "",
       params.sortDir ?? "",
+      params.all ?? false,
     ],
     queryFn: () => getTradeAdminOpenTrades(params),
     placeholderData: keepPreviousData,
     staleTime: 1000 * 30,
     refetchOnWindowFocus: false,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: true,
   });

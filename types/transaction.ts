@@ -13,6 +13,7 @@ export type AdminTransaction = {
   mode?: string;
   status?: string;
   referenceId?: string;
+  referenceDisplay?: string;
 };
 
 export type AdminTransactionPagination = {

@@ -2510,7 +2510,9 @@ export default function UserViewPage() {
                           "--"
                         )}
                       </td>
-                      <td className="px-4 py-3">{tx.referenceId ?? "--"}</td>
+                      <td className="px-4 py-3" title={tx.referenceId ?? undefined}>
+                        {tx.referenceType ?? "--"}
+                      </td>
                       <td className="px-4 py-3">{tx.remark ?? tx.notes ?? "--"}</td>
                       <td className="px-4 py-3">{formatAmount(tx.balanceAfter)}</td>
                     </tr>

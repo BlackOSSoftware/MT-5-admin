@@ -4,15 +4,17 @@ import { getAdminNotificationsService } from "@/services/notification/notificati
 interface UseGetAdminNotificationsProps {
   page: number;
   limit: number;
+  q?: string;
 }
 
 export const useGetAdminNotifications = ({
   page,
   limit,
+  q = "",
 }: UseGetAdminNotificationsProps) => {
   return useQuery({
-    queryKey: ["admin-notifications", page, limit] as const,
-    queryFn: () => getAdminNotificationsService(page, limit),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    queryKey: ["admin-notifications", page, limit, q] as const,
+    queryFn: () => getAdminNotificationsService(page, limit, q),
+    staleTime: 60 * 1000,
   });
 };

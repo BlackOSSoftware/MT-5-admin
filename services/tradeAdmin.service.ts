@@ -131,9 +131,13 @@ export type TradeAdminOpenTrade = {
   _id: string;
   userId: string;
   accountId: string;
+  brokerId?: string;
   userName?: string;
   userEmail?: string;
   accountNumber?: string;
+  accountType?: string;
+  accountBalance?: number;
+  accountEquity?: number;
   ipAddress?: string;
   positionId: string;
   ticket?: number | null;
@@ -175,6 +179,16 @@ export type TradeAdminOpenTradesResponse = {
   success?: boolean;
   data: TradeAdminOpenTrade[];
   pagination?: TradeAdminOpenTradesPagination;
+  summary?: {
+    totalPositions: number;
+    totalAccounts: number;
+    accountsWithStopLoss: number;
+    accountsWithoutStopLoss: number;
+    protectedPositions: number;
+    unprotectedPositions: number;
+    totalVolume: number;
+    totalMargin: number;
+  };
 };
 
 export type TradeAdminOpenTradesParams = {
@@ -192,6 +206,7 @@ export type TradeAdminOpenTradesParams = {
   timeField?: "openTime" | "createdAt" | "updatedAt";
   sortBy?: "openTime" | "createdAt" | "updatedAt";
   sortDir?: TradeSortDir;
+  all?: boolean;
 };
 
 export type TradeAdminPendingOrderStatus =
@@ -426,6 +441,7 @@ export const getTradeAdminOpenTrades = async (
   if (params.timeField) query.timeField = params.timeField;
   if (params.sortBy) query.sortBy = params.sortBy;
   if (params.sortDir) query.sortDir = params.sortDir;
+  if (params.all) query.all = "true";
 
   const res = await api.get("/trade-admin/trades/open", { params: query });
   return res.data as TradeAdminOpenTradesResponse;
