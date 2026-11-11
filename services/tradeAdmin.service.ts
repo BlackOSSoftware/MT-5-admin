@@ -366,6 +366,8 @@ export type TradeAdminClosedModifyPayload = {
   swap?: number;
   realizedPnL?: number;
   closeReason?: string | null;
+  openTime?: string | null;
+  closeTime?: string | null;
 };
 
 export const getTradeAdminSummary = async (): Promise<TradeAdminSummary> => {

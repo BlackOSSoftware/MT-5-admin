@@ -14,6 +14,7 @@ interface Props {
   data: AccountPlan[];
   onEdit: (plan: AccountPlan) => void;
   onDelete: (id: string) => void;
+  onOpen?: (plan: AccountPlan) => void;
 }
 
 function formatMoney(value?: number) {
@@ -88,11 +89,13 @@ function PlanRow({
   index,
   onEdit,
   onDelete,
+  onOpen,
 }: {
   plan: AccountPlan;
   index: number;
   onEdit: (plan: AccountPlan) => void;
   onDelete: (id: string) => void;
+  onOpen?: (plan: AccountPlan) => void;
 }) {
   const accent = plan.isActive
     ? "from-emerald-500 to-teal-400"
@@ -104,7 +107,10 @@ function PlanRow({
 
   return (
     <article
-      className="group relative overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] transition-all duration-200 hover:-translate-y-0.5 hover:border-sky-500/35 hover:shadow-[0_18px_40px_-28px_rgba(14,165,233,0.55)]"
+      onClick={() => onOpen?.(plan)}
+      className={`group relative overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] transition-all duration-200 hover:-translate-y-0.5 hover:border-sky-500/35 hover:shadow-[0_18px_40px_-28px_rgba(14,165,233,0.55)] ${
+        onOpen ? "cursor-pointer" : ""
+      }`}
     >
       <div
         className={`absolute inset-y-0 left-0 w-1 bg-gradient-to-b ${accent}`}
@@ -199,7 +205,10 @@ function PlanRow({
           <div className="flex items-center gap-2 lg:justify-end">
             <button
               type="button"
-              onClick={() => onEdit(plan)}
+              onClick={(event) => {
+                event.stopPropagation();
+                onEdit(plan);
+              }}
               className="btn btn-primary h-9 px-3 text-xs"
             >
               <Pencil size={13} />
@@ -207,7 +216,10 @@ function PlanRow({
             </button>
             <button
               type="button"
-              onClick={() => onDelete(plan._id)}
+              onClick={(event) => {
+                event.stopPropagation();
+                onDelete(plan._id);
+              }}
               aria-label={`Delete ${plan.name}`}
               className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[color-mix(in_srgb,var(--danger)_35%,transparent)] bg-[color-mix(in_srgb,var(--danger)_12%,transparent)] text-[var(--danger)] transition hover:bg-[color-mix(in_srgb,var(--danger)_20%,transparent)]"
             >
@@ -236,7 +248,7 @@ function PlanRow({
   );
 }
 
-export default function AccountPlanTable({ data, onEdit, onDelete }: Props) {
+export default function AccountPlanTable({ data, onEdit, onDelete, onOpen }: Props) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between px-0.5">
@@ -256,6 +268,7 @@ export default function AccountPlanTable({ data, onEdit, onDelete }: Props) {
             index={index}
             onEdit={onEdit}
             onDelete={onDelete}
+            onOpen={onOpen}
           />
         ))}
       </div>

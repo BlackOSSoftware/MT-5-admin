@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   BadgePercent,
   CheckCircle2,
@@ -21,6 +22,7 @@ import AccountPlanModal from "../components/account-plans/AccountPlanModal";
 import GlobalLoader from "../components/ui/GlobalLoader";
 
 export default function AccountPlansPage() {
+  const router = useRouter();
   const { data = [], isLoading } = useAccountPlans();
   const createPlan = useCreateAccountPlan();
   const deletePlan = useDeleteAccountPlan();
@@ -191,6 +193,7 @@ export default function AccountPlansPage() {
             const plan = data.find((item) => item._id === id);
             handleDelete(id, plan?.name || "this plan");
           }}
+          onOpen={(plan) => router.push(`/admin/account-plan/${plan._id}`)}
         />
       )}
 

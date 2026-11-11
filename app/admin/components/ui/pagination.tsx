@@ -44,7 +44,7 @@ export default function Pagination({
               focus:ring-2 focus:ring-[var(--primary)]/30
             "
           >
-            {[10, 20, 50, 100].map((n) => (
+            {[5, 10, 20, 50, 100].map((n) => (
               <option key={n} value={n}>
                 {n} / page
               </option>

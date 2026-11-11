@@ -53,6 +53,7 @@ import {
   displayUserLabel,
 } from "@/utils/displayIds";
 import TradeEditModal from "@/app/admin/components/trades/TradeEditModal";
+import RowActionsMenu from "@/app/admin/components/ui/RowActionsMenu";
 
 type OpenTradeFilters = {
   userId: string;
@@ -736,6 +737,7 @@ export default function ActivePositionsPage() {
               <table className="min-w-[1700px] w-full text-left text-sm">
                 <thead className="bg-[var(--input-bg)] text-xs uppercase text-[var(--text-muted)]">
                   <tr>
+                    <th className="px-4 py-3 w-10"></th>
                     <th className="px-4 py-3">
                       <span className="inline-flex items-center gap-1">
                         <BarChart3 size={12} /> Symbol
@@ -799,7 +801,6 @@ export default function ActivePositionsPage() {
                       </span>
                     </th>
                     <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -816,6 +817,31 @@ export default function ActivePositionsPage() {
                         router.push(`/admin/users/users/view/${trade.userId}`);
                       }}
                     >
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <RowActionsMenu
+                            items={[
+                              {
+                                key: "modify",
+                                label: "Modify",
+                                icon: <Pencil size={12} />,
+                                onClick: () => openPositionAction(trade),
+                              },
+                              {
+                                key: "close",
+                                label: "Close",
+                                icon: <XCircle size={12} />,
+                                onClick: () => openCloseConfirm(trade),
+                              },
+                              {
+                                key: "delete",
+                                label: "Delete",
+                                icon: <Trash2 size={12} />,
+                                danger: true,
+                                onClick: () => handleDeleteLive(trade),
+                              },
+                            ]}
+                          />
+                        </td>
                         <td className="whitespace-nowrap px-4 py-3 font-semibold">
                           {trade.symbol || "--"}
                         </td>
@@ -898,43 +924,6 @@ export default function ActivePositionsPage() {
                             <CheckCircle2 size={11} />
                             {trade.status || "OPEN"}
                           </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openPositionAction(trade);
-                              }}
-                              className="inline-flex items-center gap-1 rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] px-2.5 py-1 text-xs font-semibold hover:bg-[var(--hover-bg)]"
-                            >
-                              <Pencil size={12} />
-                              Modify
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openCloseConfirm(trade);
-                              }}
-                              className="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
-                            >
-                              <XCircle size={12} />
-                              Close
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteLive(trade);
-                              }}
-                              className="inline-flex items-center gap-1 rounded-md border border-rose-500/40 bg-rose-500/10 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-500/20"
-                            >
-                              <Trash2 size={12} />
-                              Delete
-                            </button>
-                          </div>
                         </td>
                       </tr>
                     );

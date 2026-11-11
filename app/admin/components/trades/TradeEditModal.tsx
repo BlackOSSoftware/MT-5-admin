@@ -29,6 +29,8 @@ export type TradeEditValues = {
   swap?: number | null;
   realizedPnL?: number | null;
   closeReason?: string | null;
+  openTime?: string | null;
+  closeTime?: string | null;
 };
 
 type FieldKey =
@@ -42,7 +44,9 @@ type FieldKey =
   | "spread"
   | "swap"
   | "realizedPnL"
-  | "closeReason";
+  | "closeReason"
+  | "openTime"
+  | "closeTime";
 
 const LIVE_FIELDS: FieldKey[] = [
   "volume",
@@ -67,6 +71,8 @@ const CLOSED_FIELDS: FieldKey[] = [
   "swap",
   "realizedPnL",
   "closeReason",
+  "openTime",
+  "closeTime",
 ];
 
 const REQUIRED_NUMERIC: FieldKey[] = [
@@ -97,11 +103,33 @@ const LABELS: Record<FieldKey, string> = {
   swap: "Swap",
   realizedPnL: "Realized PnL",
   closeReason: "Close Reason",
+  openTime: "Open Time",
+  closeTime: "Close Time",
 };
 
 function toInput(value: unknown) {
   if (value === undefined || value === null) return "";
   return String(value);
+}
+
+function toDateTimeLocalInput(value: unknown) {
+  if (value === undefined || value === null || value === "") return "";
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+    date.getDate()
+  )}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function parseDateTimeLocalInput(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Invalid ${LABELS.openTime}`);
+  }
+  return date.toISOString();
 }
 
 function normalizeCloseReasonForForm(value: unknown) {
@@ -189,6 +217,8 @@ export default function TradeEditModal({
     swap: "",
     realizedPnL: "",
     closeReason: "",
+    openTime: "",
+    closeTime: "",
   });
   const [localError, setLocalError] = useState("");
 
@@ -212,6 +242,8 @@ export default function TradeEditModal({
       swap: toInput(trade.swap),
       realizedPnL: toInput(trade.realizedPnL),
       closeReason: normalizeCloseReasonForForm(trade.closeReason),
+      openTime: toDateTimeLocalInput(trade.openTime),
+      closeTime: toDateTimeLocalInput(trade.closeTime),
     });
     // Only re-seed when modal opens or a different trade is selected.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- tradeKey captures identity
@@ -260,6 +292,15 @@ export default function TradeEditModal({
         if (key === "closeReason") {
           const trimmed = form.closeReason.trim();
           payload.closeReason = trimmed === "" ? null : trimmed;
+          continue;
+        }
+        if (key === "openTime" || key === "closeTime") {
+          const raw = form[key].trim();
+          if (raw === "") {
+            if (key === "closeTime") payload.closeTime = null;
+            continue;
+          }
+          payload[key] = parseDateTimeLocalInput(raw);
           continue;
         }
         const parsed = parseField(key, form[key]);
@@ -376,6 +417,18 @@ export default function TradeEditModal({
                           </option>
                         ))}
                       </select>
+                    ) : key === "openTime" || key === "closeTime" ? (
+                      <input
+                        type="datetime-local"
+                        value={form[key]}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            [key]: e.target.value,
+                          }))
+                        }
+                        className="w-full bg-transparent text-sm outline-none"
+                      />
                     ) : (
                       <input
                         type="number"

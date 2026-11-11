@@ -123,7 +123,7 @@ function buildNavSections(isSuperAdmin: boolean, canViewPositions: boolean): {
               },
             ]
           : []),
-        { href: "/admin/account-plan", label: "Account Plans", icon: <Gift size={18} /> },
+        { href: "/admin/account-plan", label: "Accounts", icon: <Gift size={18} /> },
       ],
     },
     

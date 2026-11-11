@@ -41,6 +41,7 @@ import {
   displayUserLabel,
 } from "@/utils/displayIds";
 import TradeEditModal from "@/app/admin/components/trades/TradeEditModal";
+import RowActionsMenu from "@/app/admin/components/ui/RowActionsMenu";
 
 type ClosedTradeFilters = {
   userId: string;
@@ -339,6 +340,14 @@ export default function ClosedTradesPage() {
           payload.closeReason === undefined
             ? undefined
             : (payload.closeReason as string | null),
+        openTime:
+          payload.openTime === undefined
+            ? undefined
+            : (payload.openTime as string | null),
+        closeTime:
+          payload.closeTime === undefined
+            ? undefined
+            : (payload.closeTime as string | null),
       },
       {
         onSuccess: () => {
@@ -617,6 +626,7 @@ export default function ClosedTradesPage() {
               <table className="min-w-[1500px] w-full text-left text-sm">
                 <thead className="bg-[var(--input-bg)] text-xs uppercase text-[var(--text-muted)]">
                   <tr>
+                    <th className="px-4 py-3 w-10"></th>
                     <th className="px-4 py-3">
                       <span className="inline-flex items-center gap-1">
                         <BarChart3 size={12} /> Symbol
@@ -697,7 +707,6 @@ export default function ClosedTradesPage() {
                         <Hash size={12} /> Position ID
                       </span>
                     </th>
-                    <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -706,6 +715,29 @@ export default function ClosedTradesPage() {
                       key={trade._id}
                       className="border-t border-[var(--card-border)] hover:bg-[var(--hover-bg)]/60"
                     >
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <RowActionsMenu
+                          items={[
+                            {
+                              key: "edit",
+                              label: "Edit",
+                              icon: <Pencil size={12} />,
+                              onClick: () => {
+                                setEditTrade(trade);
+                                setEditError("");
+                                setEditOpen(true);
+                              },
+                            },
+                            {
+                              key: "delete",
+                              label: "Delete",
+                              icon: <Trash2 size={12} />,
+                              danger: true,
+                              onClick: () => handleDeleteClosed(trade),
+                            },
+                          ]}
+                        />
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3 font-semibold">{trade.symbol || "--"}</td>
                       <td className="px-4 py-3">
                         <SideBadge side={trade.side} />
@@ -771,30 +803,6 @@ export default function ClosedTradesPage() {
                               handleCopy(displayTicket(trade), "Position ID")
                             }
                           />
-                        </div>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right">
-                        <div className="inline-flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEditTrade(trade);
-                              setEditError("");
-                              setEditOpen(true);
-                            }}
-                            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] px-2.5 py-1 text-xs font-semibold hover:bg-[var(--hover-bg)]"
-                          >
-                            <Pencil size={12} />
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteClosed(trade)}
-                            className="inline-flex items-center gap-1.5 rounded-md border border-rose-500/40 bg-rose-500/10 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-500/20"
-                          >
-                            <Trash2 size={12} />
-                            Delete
-                          </button>
                         </div>
                       </td>
                     </tr>
@@ -863,6 +871,8 @@ export default function ClosedTradesPage() {
                 swap: editTrade.swap,
                 realizedPnL: editTrade.realizedPnL,
                 closeReason: editTrade.closeReason,
+                openTime: editTrade.openTime,
+                closeTime: editTrade.closeTime,
               }
             : null
         }

@@ -59,7 +59,8 @@ import { useUpdateAdminUserAccount } from "@/hooks/useUpdateAdminUserAccount";
 import { useAdminInternalTransfer } from "@/hooks/useAdminInternalTransfer";
 import { useDeleteAdminUser } from "@/hooks/useDeleteAdminUser";
 import { useDeleteAdminUserTradeAccount } from "@/hooks/useDeleteAdminUserTradeAccount";
-import { useBonusCredit, useTradableFundCredit } from "@/hooks/bonus/useBonusCredit";
+import { useBonusCredit } from "@/hooks/bonus/useBonusCredit";
+import { useCreateAdminDeposit } from "@/hooks/deposit/useCreateAdminDeposit";
 import { useAdminUserReferralSummary } from "@/hooks/referrals/useAdminUserReferralSummary";
 import {
   useResetAccountTradePassword,
@@ -395,7 +396,7 @@ export default function UserViewPage() {
   const updateAccountMutation = useUpdateAdminUserAccount();
   const internalTransferMutation = useAdminInternalTransfer();
   const bonusCreditMutation = useBonusCredit();
-  const tradableFundCreditMutation = useTradableFundCredit();
+  const adminDepositMutation = useCreateAdminDeposit();
   const deleteUserMutation = useDeleteAdminUser();
   const deleteTradeAccountMutation = useDeleteAdminUserTradeAccount();
   const resetTradePasswordMutation = useResetAccountTradePassword();
@@ -525,10 +526,12 @@ export default function UserViewPage() {
   const [bonusAccountId, setBonusAccountId] = useState("");
   const [bonusAmount, setBonusAmount] = useState("");
   const [bonusError, setBonusError] = useState("");
-  const [tradableFundModalOpen, setTradableFundModalOpen] = useState(false);
-  const [tradableFundAccountId, setTradableFundAccountId] = useState("");
-  const [tradableFundAmount, setTradableFundAmount] = useState("");
-  const [tradableFundError, setTradableFundError] = useState("");
+  const [depositModalOpen, setDepositModalOpen] = useState(false);
+  const [depositAccountId, setDepositAccountId] = useState("");
+  const [depositAmount, setDepositAmount] = useState("");
+  const [depositMethod, setDepositMethod] = useState("MANUAL");
+  const [depositRemark, setDepositRemark] = useState("");
+  const [depositError, setDepositError] = useState("");
   const [internalTransferFrom, setInternalTransferFrom] = useState("");
   const [internalTransferTo, setInternalTransferTo] = useState("");
   const [internalTransferAmount, setInternalTransferAmount] = useState("");
@@ -1365,29 +1368,28 @@ export default function UserViewPage() {
     setBonusError("");
   };
 
-  const openTradableFundModal = (accountId?: string) => {
-    const liveAccounts = nonDemoAccounts.filter(
-      (account) => (account.account_type ?? "").toLowerCase() === "live"
-    );
-    if (!liveAccounts.length) {
-      setToast("No live account available for tradable fund.");
+  const openDepositModal = (accountId?: string) => {
+    if (!nonDemoAccounts.length) {
+      setToast("No account available for deposit.");
       return;
     }
 
     const resolvedAccountId =
-      accountId && liveAccounts.some((account) => account._id === accountId)
+      accountId && nonDemoAccounts.some((account) => account._id === accountId)
         ? accountId
-        : liveAccounts[0]?._id ?? "";
+        : nonDemoAccounts[0]?._id ?? "";
 
-    setTradableFundAccountId(resolvedAccountId);
-    setTradableFundAmount("");
-    setTradableFundError("");
-    setTradableFundModalOpen(true);
+    setDepositAccountId(resolvedAccountId);
+    setDepositAmount("");
+    setDepositMethod("MANUAL");
+    setDepositRemark("");
+    setDepositError("");
+    setDepositModalOpen(true);
   };
 
-  const closeTradableFundModal = () => {
-    setTradableFundModalOpen(false);
-    setTradableFundError("");
+  const closeDepositModal = () => {
+    setDepositModalOpen(false);
+    setDepositError("");
   };
 
   const handleBonusSubmit = async (event: FormEvent) => {
@@ -1432,39 +1434,32 @@ export default function UserViewPage() {
     }
   };
 
-  const handleTradableFundSubmit = async (event: FormEvent) => {
+  const handleDepositSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    setTradableFundError("");
+    setDepositError("");
 
-    if (!userId) {
-      setTradableFundError("User not found.");
+    if (!depositAccountId) {
+      setDepositError("Please select an account.");
       return;
     }
 
-    if (!tradableFundAccountId) {
-      setTradableFundError("Please select an account.");
-      return;
-    }
-
-    const amount = parseNullableNumber(tradableFundAmount);
+    const amount = parseNullableNumber(depositAmount);
     if (amount === null || amount <= 0) {
-      setTradableFundError(
-        "Please enter a valid tradable fund amount greater than 0."
-      );
+      setDepositError("Please enter a valid deposit amount greater than 0.");
       return;
     }
 
     try {
-      const response = await tradableFundCreditMutation.mutateAsync({
-        userId,
-        accountId: tradableFundAccountId,
-        tradableFundAmount: amount,
+      await adminDepositMutation.mutateAsync({
+        accountId: depositAccountId,
+        amount,
+        method: depositMethod,
+        remark: depositRemark.trim() || undefined,
       });
 
       await Promise.all([accountsQuery.refetch(), transactionsQuery.refetch()]);
-      closeTradableFundModal();
-      const added = response.data?.tradableFundAdded ?? amount;
-      setToast(`Tradable fund added successfully: $${formatAmount(added)}`);
+      closeDepositModal();
+      setToast(`Deposit added successfully: $${formatAmount(amount)}`);
     } catch (error) {
       const message =
         typeof error === "object" && error !== null
@@ -1472,7 +1467,7 @@ export default function UserViewPage() {
               ?.data?.message ??
               (error as { message?: string }).message)
           : undefined;
-      setTradableFundError(message || "Unable to add tradable fund.");
+      setDepositError(message || "Unable to add deposit.");
     }
   };
 
@@ -1711,6 +1706,14 @@ export default function UserViewPage() {
           payload.closeReason === undefined
             ? undefined
             : (payload.closeReason as string | null),
+        openTime:
+          payload.openTime === undefined
+            ? undefined
+            : (payload.openTime as string | null),
+        closeTime:
+          payload.closeTime === undefined
+            ? undefined
+            : (payload.closeTime as string | null),
       },
       {
         onSuccess: () => {
@@ -2559,12 +2562,12 @@ export default function UserViewPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => openTradableFundModal()}
+                  onClick={() => openDepositModal()}
                   disabled={!nonDemoAccounts.length}
                   className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-500/15 disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <DollarSign size={14} />
-                  Add Tradable Fund
+                  Add Deposit
                 </button>
                 <button
                   type="button"
@@ -3648,44 +3651,44 @@ export default function UserViewPage() {
       </Modal>
 
       <Modal
-        title="Add Tradable Fund"
-        open={tradableFundModalOpen}
-        onClose={closeTradableFundModal}
+        title="Add Deposit"
+        open={depositModalOpen}
+        onClose={closeDepositModal}
         size="sm"
         footer={
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button
               type="button"
-              onClick={closeTradableFundModal}
+              onClick={closeDepositModal}
               className="w-full rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] px-4 py-2 text-sm font-semibold hover:bg-[var(--hover-bg)] sm:w-auto"
             >
               Cancel
             </button>
             <button
               type="submit"
-              form="add-tradable-fund-form"
-              disabled={tradableFundCreditMutation.isPending}
+              form="add-deposit-form"
+              disabled={adminDepositMutation.isPending}
               className="w-full rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 sm:w-auto"
             >
-              {tradableFundCreditMutation.isPending ? "Adding..." : "Submit"}
+              {adminDepositMutation.isPending ? "Adding..." : "Submit"}
             </button>
           </div>
         }
       >
         <form
-          id="add-tradable-fund-form"
-          onSubmit={handleTradableFundSubmit}
+          id="add-deposit-form"
+          onSubmit={handleDepositSubmit}
           className="space-y-4"
         >
-          {tradableFundError ? (
+          {depositError ? (
             <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
-              {tradableFundError}
+              {depositError}
             </div>
           ) : null}
 
-          <div className="rounded-xl border border-amber-300/40 bg-amber-500/5 px-3 py-3 text-xs text-amber-800">
-            Tradable fund updates real balance for trading, but the added amount remains
-            non-withdrawable. It can be used in trades and can also be lost in trading.
+          <div className="rounded-xl border border-emerald-300/40 bg-emerald-500/5 px-3 py-3 text-xs text-emerald-800">
+            This adds a real deposit to the account balance. It is fully
+            withdrawable and will appear in the account transactions.
           </div>
 
           <div>
@@ -3693,37 +3696,68 @@ export default function UserViewPage() {
               Select Account
             </label>
             <select
-              value={tradableFundAccountId}
-              onChange={(event) => setTradableFundAccountId(event.target.value)}
+              value={depositAccountId}
+              onChange={(event) => setDepositAccountId(event.target.value)}
               className="mt-1 h-11 w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 text-sm text-[var(--text-main)] outline-none focus:ring-2 focus:ring-emerald-500/20"
             >
-              <option value="">Select live account</option>
-              {nonDemoAccounts
-                .filter((account) => (account.account_type ?? "").toLowerCase() === "live")
-                .map((account) => (
-                  <option key={account._id} value={account._id}>
-                    {account.account_number || account._id} | Real ${formatAmount(account.balance)} | Locked ${formatAmount(account.non_withdrawable_balance)}
-                  </option>
-                ))}
+              <option value="">Select account</option>
+              {nonDemoAccounts.map((account) => (
+                <option key={account._id} value={account._id}>
+                  {account.account_number || account._id} | Balance ${formatAmount(account.balance)}
+                </option>
+              ))}
             </select>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-xs font-medium text-[var(--text-muted)]">
+                Deposit Amount
+              </label>
+              <FieldControl icon={DollarSign}>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.01"
+                  value={depositAmount}
+                  onChange={(event) => setDepositAmount(event.target.value)}
+                  placeholder="Enter deposit amount"
+                  className="w-full bg-transparent text-sm text-[var(--text-main)] outline-none placeholder:text-[var(--text-muted)]"
+                />
+              </FieldControl>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-[var(--text-muted)]">
+                Method
+              </label>
+              <select
+                value={depositMethod}
+                onChange={(event) => setDepositMethod(event.target.value)}
+                className="mt-1 h-11 w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 text-sm text-[var(--text-main)] outline-none focus:ring-2 focus:ring-emerald-500/20"
+              >
+                <option value="MANUAL">Manual</option>
+                <option value="UPI">UPI</option>
+                <option value="BANK">Bank</option>
+                <option value="CRYPTO">Crypto</option>
+                <option value="INTERNATIONAL">International</option>
+              </select>
+            </div>
           </div>
 
           <div>
             <label className="text-xs font-medium text-[var(--text-muted)]">
-              Tradable Fund Amount
+              Remark (optional)
             </label>
-            <FieldControl icon={DollarSign}>
-              <input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="0.01"
-                value={tradableFundAmount}
-                onChange={(event) => setTradableFundAmount(event.target.value)}
-                placeholder="Enter tradable fund amount"
-                className="w-full bg-transparent text-sm text-[var(--text-main)] outline-none placeholder:text-[var(--text-muted)]"
-              />
-            </FieldControl>
+            <textarea
+              value={depositRemark}
+              onChange={(event) => setDepositRemark(event.target.value)}
+              rows={2}
+              maxLength={500}
+              placeholder="e.g. Bank transfer ref #12345"
+              className="mt-1 w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--text-main)] outline-none placeholder:text-[var(--text-muted)] focus:ring-2 focus:ring-emerald-500/20"
+            />
           </div>
         </form>
       </Modal>
@@ -4240,6 +4274,8 @@ export default function UserViewPage() {
                 swap: closedEditTrade.swap,
                 realizedPnL: closedEditTrade.realizedPnL,
                 closeReason: closedEditTrade.closeReason,
+                openTime: closedEditTrade.openTime,
+                closeTime: closedEditTrade.closeTime,
               }
             : null
         }

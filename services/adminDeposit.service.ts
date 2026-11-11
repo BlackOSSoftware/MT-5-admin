@@ -23,6 +23,7 @@ export interface CreateAdminDepositPayload {
   accountId: string;
   amount: number;
   method: string;
+  remark?: string;
 }
 
 export interface CreateAdminDepositData {
