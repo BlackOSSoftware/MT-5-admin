@@ -36,6 +36,9 @@ export default function CustomCursor() {
     const onMove = (e: MouseEvent) => {
       x = e.clientX;
       y = e.clientY;
+      if (ref.current && ref.current.style.opacity !== "1") {
+        ref.current.style.opacity = "1";
+      }
       if (!raf) {
         raf = requestAnimationFrame(() => {
           raf = 0;
