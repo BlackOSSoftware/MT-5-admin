@@ -142,6 +142,14 @@ function formatTradeDuration(openTime?: string, closeTime?: string) {
   return parts.join(" ");
 }
 
+function formatSlippage(trade: TradeAdminClosedTrade) {
+  if (!trade.slippageApplied) return "--";
+  const pts = Number(trade.slippagePoints) || 0;
+  const diff = Number(trade.slippagePriceDifference) || 0;
+  const mode = trade.slippageMode ? ` ${trade.slippageMode}` : "";
+  return `${pts} pts / ${diff}${mode}`;
+}
+
 function getSideMeta(side?: string) {
   const normalizedSide = (side ?? "").toUpperCase();
 
@@ -654,6 +662,16 @@ export default function ClosedTradesPage() {
                     </th>
                     <th className="px-4 py-3">
                       <span className="inline-flex items-center gap-1">
+                        <DollarSign size={12} /> Ref Price
+                      </span>
+                    </th>
+                    <th className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1">
+                        <SlidersHorizontal size={12} /> Slippage
+                      </span>
+                    </th>
+                    <th className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1">
                         <DollarSign size={12} /> Close Price
                       </span>
                     </th>
@@ -747,6 +765,20 @@ export default function ClosedTradesPage() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">{formatNumber(trade.volume, 4)}</td>
                       <td className="whitespace-nowrap px-4 py-3">{formatNumber(trade.openPrice, 5)}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        {trade.referencePrice != null
+                          ? formatNumber(trade.referencePrice, 5)
+                          : "--"}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs">
+                        {trade.slippageApplied ? (
+                          <span className="font-semibold text-amber-600">
+                            {formatSlippage(trade)}
+                          </span>
+                        ) : (
+                          <span className="text-[var(--text-muted)]">--</span>
+                        )}
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3">{formatNumber(trade.closePrice, 5)}</td>
                       <td className="whitespace-nowrap px-4 py-3">{formatNumber(trade.spread, 4)}</td>
                       <td className="whitespace-nowrap px-4 py-3">{formatNumber(trade.commission, 4)}</td>
@@ -1026,6 +1058,15 @@ function MobileTradeCard({
         <SmallField label="Order" value={trade.orderType || "--"} />
         <SmallField label="Volume" value={formatNumber(trade.volume, 4)} />
         <SmallField label="Open" value={formatNumber(trade.openPrice, 5)} />
+        <SmallField
+          label="Ref Price"
+          value={
+            trade.referencePrice != null
+              ? formatNumber(trade.referencePrice, 5)
+              : "--"
+          }
+        />
+        <SmallField label="Slippage" value={formatSlippage(trade)} />
         <SmallField label="Close" value={formatNumber(trade.closePrice, 5)} />
         <SmallField label="Spread" value={formatNumber(trade.spread, 4)} />
         <SmallField label="Commission" value={formatNumber(trade.commission, 4)} />

@@ -80,6 +80,13 @@ export type TradeAdminClosedTrade = {
   openPrice: number;
   entryPrice: number;
   closePrice: number;
+  referencePrice?: number | null;
+  executedPrice?: number | null;
+  slippageApplied?: boolean;
+  slippagePoints?: number;
+  slippagePriceDifference?: number;
+  slippageMode?: "FIXED" | "RANDOM" | null;
+  executionType?: string | null;
   stopLoss: number | null;
   takeProfit: number | null;
   marginUsed: number;
@@ -152,6 +159,13 @@ export type TradeAdminOpenTrade = {
   openPrice: number;
   entryPrice: number;
   closePrice?: number | null;
+  referencePrice?: number | null;
+  executedPrice?: number | null;
+  slippageApplied?: boolean;
+  slippagePoints?: number;
+  slippagePriceDifference?: number;
+  slippageMode?: "FIXED" | "RANDOM" | null;
+  executionType?: string | null;
   stopLoss?: number | null;
   takeProfit?: number | null;
   marginUsed?: number;

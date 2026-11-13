@@ -42,7 +42,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLogout } from "@/hooks/useAuth";
 import adminService from "@/services/admin.service";
-import { canViewClientPositions } from "@/utils/adminPermissions";
+import { canManageSlippage, canViewClientPositions } from "@/utils/adminPermissions";
 
 /* ================= TYPES ================= */
 
@@ -55,7 +55,11 @@ interface NavItem {
 
 /* ================= NAV CONFIG ================= */
 
-function buildNavSections(isSuperAdmin: boolean, canViewPositions: boolean): {
+function buildNavSections(
+  isSuperAdmin: boolean,
+  canViewPositions: boolean,
+  canSlippage: boolean,
+): {
   title: string;
   items: NavItem[];
 }[] {
@@ -125,6 +129,15 @@ function buildNavSections(isSuperAdmin: boolean, canViewPositions: boolean): {
             ]
           : []),
         { href: "/admin/account-plan", label: "Accounts", icon: <Gift size={18} /> },
+        ...(canSlippage
+          ? [
+              {
+                href: "/admin/slippage-settings",
+                label: "Slippage Settings",
+                icon: <Percent size={18} />,
+              },
+            ]
+          : []),
       ],
     },
     
@@ -214,6 +227,7 @@ export default function AdminSidebar() {
   const [pinnedDropdown, setPinnedDropdown] = useState<string | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [canViewPositions, setCanViewPositions] = useState(false);
+  const [canSlippage, setCanSlippage] = useState(false);
   const [me, setMe] = useState<{
     name?: string;
     email?: string;
@@ -236,6 +250,7 @@ export default function AdminSidebar() {
         if (cancelled || !data) return;
         setMe(data);
         setCanViewPositions(canViewClientPositions(data));
+        setCanSlippage(canManageSlippage(data));
       })
       .catch(() => {});
     return () => {
@@ -244,8 +259,8 @@ export default function AdminSidebar() {
   }, []);
 
   const navSections = useMemo(
-    () => buildNavSections(isSuperAdmin, canViewPositions),
-    [isSuperAdmin, canViewPositions],
+    () => buildNavSections(isSuperAdmin, canViewPositions, canSlippage),
+    [isSuperAdmin, canViewPositions, canSlippage],
   );
 
   const normalize = (p: string) => p.replace(/\/+$/, "");
