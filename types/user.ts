@@ -9,6 +9,7 @@ export type AdminUser = {
   createdAt: string;
   isOnline?: boolean;
   lastSeenAt?: string | null;
+  device?: string | null;
   ibDashboardEnabled?: boolean;
   broker?: { _id: string; displayName: string; code: string } | null;
 };
