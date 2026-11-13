@@ -83,6 +83,7 @@ import type {
 import { displayTicket } from "@/utils/displayIds";
 import TradeEditModal from "@/app/admin/components/trades/TradeEditModal";
 import PresenceBadge from "@/app/admin/components/ui/PresenceBadge";
+import IbDashboardTab from "@/app/admin/components/users/IbDashboardTab";
 
 const kycStyles: Record<string, string> = {
   VERIFIED: "border-emerald-500/40 bg-emerald-500/5 text-emerald-600",
@@ -427,7 +428,12 @@ export default function UserViewPage() {
   const [toast, setToast] = useState("");
   const [touched, setTouched] = useState<Partial<Record<keyof AdminUserUpdatePayload, boolean>>>({});
   const [activeTab, setActiveTab] = useState<
-    "Fund History" | "Accounts" | "Active Trades" | "Closed Trades" | "Pending Trades"
+    | "Fund History"
+    | "Accounts"
+    | "Active Trades"
+    | "Closed Trades"
+    | "Pending Trades"
+    | "IB Dashboard"
   >(() => {
     const normalized = (searchParams.get("tab") ?? "").toLowerCase();
     if (
@@ -2131,26 +2137,23 @@ export default function UserViewPage() {
         )}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
           <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-            <Wallet size={14} /> Wallet balance
+            <Wallet size={14} /> Remaining commission
           </div>
           <p className="mt-2 text-2xl font-semibold tabular-nums text-sky-600">
             $
-            {formatAmount(
-              Math.max(
-                0,
-                Number(userQuery.data?.wallet_balance || 0) -
-                  Number(userQuery.data?.wallet_hold_balance || 0)
-              )
-            )}
+            {referralSummaryQuery.isLoading
+              ? "…"
+              : formatAmount(referralSummaryQuery.data?.referralBalance ?? 0)}
           </p>
           <p className="mt-1 text-xs text-[var(--text-muted)]">
-            Total ${formatAmount(Number(userQuery.data?.wallet_balance || 0))}
-            {Number(userQuery.data?.wallet_hold_balance || 0) > 0
-              ? ` · Hold $${formatAmount(Number(userQuery.data?.wallet_hold_balance || 0))}`
-              : ""}
+            Available to withdraw
+            {" · Total earned $"}
+            {referralSummaryQuery.isLoading
+              ? "…"
+              : formatAmount(referralSummaryQuery.data?.totalEarned ?? 0)}
           </p>
         </div>
         <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
@@ -2182,20 +2185,6 @@ export default function UserViewPage() {
         </div>
         <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
           <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
-            <DollarSign size={14} /> Referral balance
-          </div>
-          <p className="mt-2 text-2xl font-semibold tabular-nums">
-            $
-            {referralSummaryQuery.isLoading
-              ? "…"
-              : formatAmount(referralSummaryQuery.data?.referralBalance ?? 0)}
-          </p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">
-            Available referral wallet balance
-          </p>
-        </div>
-        <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
             <Percent size={14} /> Pending rewards
           </div>
           <p className="mt-2 text-2xl font-semibold tabular-nums">
@@ -2221,7 +2210,14 @@ export default function UserViewPage() {
 
 	      <div className="flex flex-wrap gap-2">
 	        {(
-	          ["Fund History", "Accounts", "Active Trades", "Closed Trades", "Pending Trades"] as const
+	          [
+	            "Fund History",
+	            "Accounts",
+	            "Active Trades",
+	            "Closed Trades",
+	            "Pending Trades",
+	            ...(userQuery.data?.ibDashboardEnabled ? (["IB Dashboard"] as const) : []),
+	          ] as const
 	        ).map((tab) => (
             <button
               key={tab}
@@ -3490,6 +3486,10 @@ export default function UserViewPage() {
           )}
         </div>
       )}
+
+      {activeTab === "IB Dashboard" && userQuery.data?.ibDashboardEnabled && userId ? (
+        <IbDashboardTab userId={userId} />
+      ) : null}
 
       <Modal
         title="Account Details"

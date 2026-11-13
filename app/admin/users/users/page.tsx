@@ -13,11 +13,13 @@ import {
   XCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Laptop, Smartphone } from "lucide-react";
 import Pagination from "../../components/ui/pagination";
 import GlobalLoader from "../../components/ui/GlobalLoader";
 import DragScroll from "../../components/ui/DragScroll";
 import { useAdminUsers } from "@/hooks/useAdminUsers";
+import { setAdminUserIbDashboard } from "@/services/user.service";
 import type { AdminUser } from "@/types/user";
 import PresenceBadge from "@/app/admin/components/ui/PresenceBadge";
 
@@ -384,25 +386,26 @@ export default function UsersPage() {
                 {isSuperAdmin && <th className="px-4 py-3">Admin / Broker</th>}
                 <th className="px-4 py-3">Mail</th>
                 <th className="px-4 py-3">KYC</th>
+                {ibToggleAllowed && <th className="px-4 py-3">IB Dashboard</th>}
                 <th className="px-4 py-3">Created</th>
               </tr>
             </thead>
             <tbody>
               {isInitialLoading ? (
                 <tr>
-                  <td colSpan={10} className="py-10 text-center">
+                  <td colSpan={colCount} className="py-10 text-center">
                     <GlobalLoader />
                   </td>
                 </tr>
               ) : listQuery.isError ? (
                 <tr>
-                  <td colSpan={10} className="py-10 text-center text-sm text-[var(--danger)]">
+                  <td colSpan={colCount} className="py-10 text-center text-sm text-[var(--danger)]">
                     Failed to load users. Please try again.
                   </td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-10 text-center text-sm text-[var(--text-muted)]">
+                  <td colSpan={colCount} className="py-10 text-center text-sm text-[var(--text-muted)]">
                     No users found.
                   </td>
                 </tr>
@@ -483,6 +486,11 @@ export default function UsersPage() {
                         {u.kycStatus || "UNKNOWN"}
                       </span>
                     </td>
+                    {ibToggleAllowed && (
+                      <td className="px-4 py-3">
+                        <IbDashboardToggle userId={u._id} enabled={Boolean(u.ibDashboardEnabled)} />
+                      </td>
+                    )}
                     <td className="px-4 py-3">{formatDate(u.createdAt)}</td>
                   </tr>
                 ))
@@ -503,6 +511,58 @@ export default function UsersPage() {
           setPage(1);
         }}
       />
+    </div>
+  );
+}
+
+function IbDashboardToggle({ userId, enabled }: { userId: string; enabled: boolean }) {
+  const queryClient = useQueryClient();
+  const [pending, setPending] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const shown = pending ?? enabled;
+
+  const toggle = async () => {
+    if (pending !== null) return;
+    const next = !enabled;
+    setPending(next);
+    setError(null);
+    try {
+      await setAdminUserIbDashboard(userId, next);
+      await queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      setError(e?.response?.data?.message || e?.message || "Update failed");
+    } finally {
+      setPending(null);
+    }
+  };
+
+  return (
+    <div
+      className="flex items-center gap-2"
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        role="switch"
+        aria-checked={shown}
+        aria-label={shown ? "Disable IB dashboard" : "Enable IB dashboard"}
+        disabled={pending !== null}
+        onClick={toggle}
+        className={`relative h-5 w-9 shrink-0 rounded-full transition disabled:opacity-60 ${
+          shown ? "bg-emerald-500" : "bg-slate-300"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${
+            shown ? "left-[18px]" : "left-0.5"
+          }`}
+        />
+      </button>
+      <span className={`text-[11px] font-medium ${shown ? "text-emerald-600" : "text-[var(--text-muted)]"}`}>
+        {error ? <span className="text-[var(--danger)]">{error}</span> : shown ? "Enabled" : "Disabled"}
+      </span>
     </div>
   );
 }

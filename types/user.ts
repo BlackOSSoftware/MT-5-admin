@@ -50,6 +50,9 @@ export type AdminUserProfile = {
   createdAt?: string;
   isOnline?: boolean;
   lastSeenAt?: string | null;
+  ibDashboardEnabled?: boolean;
+  /** Sum of live trading account balances — same as portal "wallet balance". */
+  trading_balance?: number;
   date_of_birth?: string;
   gender?: string;
   address_line_1?: string;
