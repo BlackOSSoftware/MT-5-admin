@@ -29,6 +29,7 @@ import type { AdminAccountItem } from "@/services/adminAccounts.service";
 import GlobalLoader from "@/app/admin/components/ui/GlobalLoader";
 import Pagination from "@/app/admin/components/ui/pagination";
 import DragScroll from "@/app/admin/components/ui/DragScroll";
+import PlanScriptSpreadsPanel from "@/app/admin/components/account-plans/PlanScriptSpreadsPanel";
 
 function formatMoney(value?: number | null, digits = 2) {
   if (value === undefined || value === null || Number.isNaN(value)) return "--";
@@ -149,6 +150,7 @@ export default function AccountPlanDetailPage() {
     [plans, planId]
   );
 
+  const [tab, setTab] = useState<"accounts" | "spreads">("spreads");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [search, setSearch] = useState("");
@@ -302,7 +304,35 @@ export default function AccountPlanDetailPage() {
         </div>
       </header>
 
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setTab("spreads")}
+          className={`rounded-xl px-3 py-2 text-sm font-medium ${
+            tab === "spreads"
+              ? "bg-[var(--primary)] text-white"
+              : "border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--text-muted)]"
+          }`}
+        >
+          Script Spreads
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("accounts")}
+          className={`rounded-xl px-3 py-2 text-sm font-medium ${
+            tab === "accounts"
+              ? "bg-[var(--primary)] text-white"
+              : "border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--text-muted)]"
+          }`}
+        >
+          Trading Accounts
+        </button>
+      </div>
+
+      {tab === "spreads" ? <PlanScriptSpreadsPanel planId={planId} /> : null}
+
       {/* Accounts table */}
+      {tab === "accounts" ? (
       <div className="rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)]">
         <div className="flex flex-col gap-3 border-b border-[var(--card-border)] p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -589,6 +619,7 @@ export default function AccountPlanDetailPage() {
           }}
         />
       </div>
+      ) : null}
 
       {copyToast ? (
         <div className="fixed bottom-5 right-5 z-50 rounded-md bg-[var(--foreground)] px-3 py-1.5 text-xs font-semibold text-white shadow-lg">

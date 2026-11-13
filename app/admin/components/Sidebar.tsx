@@ -35,6 +35,7 @@ import {
   Trash2,
   UserPlus,
   BarChart3,
+  Percent,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -179,6 +180,7 @@ function buildNavSections(isSuperAdmin: boolean, canViewPositions: boolean): {
           children: [
             { href: "/admin/referral", label: "Reward Approvals", icon: <Gift size={14} /> },
             { href: "/admin/referral/network", label: "Network Report", icon: <Users size={14} /> },
+            { href: "/admin/referral/ib-settings", label: "IB Level Settings", icon: <Percent size={14} /> },
             { href: "/admin/bonus", label: "Bonus", icon: <DollarSign size={14} /> },
           ],
         },
