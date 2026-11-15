@@ -341,6 +341,7 @@ export type TradeAdminPendingModifyPayload = {
   price?: number;
   stopLoss?: number | null;
   takeProfit?: number | null;
+  createdAt?: string | null;
 };
 
 export type TradeAdminPendingCancelPayload = {
@@ -357,6 +358,7 @@ export type TradeAdminPositionModifyPayload = {
   openPrice?: number;
   stopLoss?: number | null;
   takeProfit?: number | null;
+  openTime?: string | null;
 };
 
 export type TradeAdminPositionClosePayload = {

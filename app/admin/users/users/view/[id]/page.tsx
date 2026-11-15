@@ -1629,6 +1629,10 @@ export default function UserViewPage() {
           payload.takeProfit === undefined
             ? undefined
             : (payload.takeProfit as number | null),
+        openTime:
+          payload.openTime === undefined
+            ? undefined
+            : (payload.openTime as string | null),
       },
       {
         onSuccess: () => {
@@ -1659,6 +1663,10 @@ export default function UserViewPage() {
           payload.takeProfit === undefined
             ? undefined
             : (payload.takeProfit as number | null),
+        createdAt:
+          payload.createdAt === undefined
+            ? undefined
+            : (payload.createdAt as string | null),
       },
       {
         onSuccess: () => {
@@ -4210,6 +4218,11 @@ export default function UserViewPage() {
                 openPrice: positionAction.openPrice,
                 stopLoss: positionAction.stopLoss,
                 takeProfit: positionAction.takeProfit,
+                openTime:
+                  typeof positionAction.openTime === "number" &&
+                  Number.isFinite(positionAction.openTime)
+                    ? new Date(positionAction.openTime).toISOString()
+                    : undefined,
               }
             : null
         }
@@ -4238,6 +4251,7 @@ export default function UserViewPage() {
                 price: pendingAction.price,
                 stopLoss: pendingAction.stopLoss,
                 takeProfit: pendingAction.takeProfit,
+                createdAt: pendingAction.createdAt,
               }
             : null
         }

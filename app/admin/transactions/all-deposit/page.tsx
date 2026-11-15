@@ -28,8 +28,20 @@ import { useAdminDeposits } from "@/hooks/deposit/useAdminDeposits";
 import { useApproveDeposit, useRejectDeposit } from "@/hooks/deposit/useDepositActions";
 import Pagination from "../../components/ui/pagination";
 import DragScroll from "../../components/ui/DragScroll";
+import ReportExportButtons from "../../components/ui/ReportExportButtons";
 import { useEditDepositAmount } from "@/hooks/deposit/useEditDepositAmount";
-import type { DepositMethod, DepositSortBy, SortDir } from "@/services/adminDeposit.service";
+import {
+  getAdminDeposits,
+  type DepositMethod,
+  type DepositSortBy,
+  type SortDir,
+} from "@/services/adminDeposit.service";
+import {
+  downloadCsv,
+  downloadPdfReport,
+  type ReportColumn,
+  type ReportRow,
+} from "@/utils/reportExport";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -55,6 +67,12 @@ type DepositRow = {
   proof?: {
     image_url?: string;
   };
+  actionBy?: {
+    _id?: string;
+    name?: string;
+    email?: string;
+  } | string | null;
+  actionAt?: string;
 };
 
 const getErrorMessage = (error: unknown, fallback: string) => {
@@ -101,6 +119,39 @@ const formatTime = (value?: string) => {
   });
 };
 
+const formatDateTime = (value?: string) => {
+  if (!value) return "--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--";
+  return `${date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })}, ${date.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
+};
+
+const REPORT_COLUMNS: ReportColumn[] = [
+  { key: "id", label: "Deposit ID" },
+  { key: "userName", label: "User Name" },
+  { key: "userEmail", label: "Email" },
+  { key: "accountNo", label: "Account No" },
+  { key: "plan", label: "Plan" },
+  { key: "amount", label: "Amount", align: "right" },
+  { key: "method", label: "Method" },
+  { key: "status", label: "Status" },
+  { key: "createdAt", label: "Created At" },
+  { key: "updatedAt", label: "Updated At" },
+  { key: "actionAt", label: "Action At" },
+  { key: "actionBy", label: "Action By" },
+  { key: "rejectionReason", label: "Rejection Reason" },
+];
+
+const getStr = (v: unknown): string =>
+  v === null || v === undefined ? "" : String(v);
+
 export default function AllDeposit() {
   const router = useRouter();
   const [page, setPage] = useState(1);
@@ -117,6 +168,7 @@ export default function AllDeposit() {
   const [rejectReason, setRejectReason] = useState("");
   const [editOpen, setEditOpen] = useState(false);
   const [editAmount, setEditAmount] = useState("");
+  const [reportLoading, setReportLoading] = useState(false);
   const editMutation = useEditDepositAmount();
 
   useEffect(() => {
@@ -257,6 +309,123 @@ export default function AllDeposit() {
     return <FileText size={12} />;
   }, []);
 
+  const buildReportRows = useCallback((items: DepositRow[]): ReportRow[] => {
+    return items.map((d) => {
+      const extra = d as unknown as Record<string, unknown>;
+      return {
+        id: getStr(d._id ?? d.id).slice(-8).toUpperCase(),
+        userName: getStr(d.user?.name) || "--",
+        userEmail: getStr(d.user?.email) || "--",
+        accountNo: getStr(d.account?.account_number) || "--",
+        plan: getStr(d.account?.plan_name) || "--",
+        amount: typeof d.amount === "number" ? `$${d.amount.toLocaleString()}` : "--",
+        amountRaw: typeof d.amount === "number" ? d.amount : 0,
+        method: getStr(d.method) || "--",
+        status: getStr(d.status) || "--",
+        createdAt: formatDateTime(d.createdAt),
+        updatedAt: formatDateTime(d.updatedAt),
+        actionAt: formatDateTime(getStr(extra.actionAt) || undefined),
+        actionBy: (() => {
+          const ab = extra.actionBy;
+          if (ab && typeof ab === "object") {
+            const o = ab as { name?: string; email?: string };
+            return [o.name, o.email].filter(Boolean).join(" (") +
+              ([o.name, o.email].filter(Boolean).length ? ")" : "") || "--";
+          }
+          return "--";
+        })(),
+        rejectionReason: getStr(extra.rejectionReason) || "--",
+      };
+    });
+  }, []);
+
+  const fetchAllReportRows = useCallback(async (): Promise<DepositRow[]> => {
+    const all: DepositRow[] = [];
+    let pageNum = 1;
+    const pageSize = 100;
+    // Safety cap: 50 pages = 5000 records
+    for (let i = 0; i < 50; i += 1) {
+      const res = await getAdminDeposits({
+        page: pageNum,
+        limit: pageSize,
+        status,
+        q: q || undefined,
+        method: method || undefined,
+        fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
+        sortBy,
+        sortDir,
+      });
+      const batch = (res.data as DepositRow[]) ?? [];
+      all.push(...batch);
+      const totalPages = res.totalPages ?? Math.ceil((res.total || 0) / pageSize);
+      if (batch.length < pageSize || pageNum >= totalPages) break;
+      pageNum += 1;
+    }
+    return all;
+  }, [status, q, method, fromDate, toDate, sortBy, sortDir]);
+
+  const reportFilterSummary = useCallback(() => {
+    const items: Array<{ label: string; value: string }> = [];
+    items.push({ label: "Status", value: status || "All" });
+    items.push({ label: "Method", value: method || "All" });
+    if (q) items.push({ label: "Search", value: q });
+    if (fromDate) items.push({ label: "From", value: fromDate });
+    if (toDate) items.push({ label: "To", value: toDate });
+    items.push({ label: "Sort", value: `${sortBy} (${sortDir})` });
+    return items;
+  }, [status, method, q, fromDate, toDate, sortBy, sortDir]);
+
+  const handleExportCsv = useCallback(async () => {
+    setReportLoading(true);
+    try {
+      const items = await fetchAllReportRows();
+      const rows = buildReportRows(items);
+      const stamp = new Date().toISOString().slice(0, 10);
+      downloadCsv(`deposits-report-${stamp}.csv`, REPORT_COLUMNS, rows);
+      toast.success(`CSV downloaded — ${rows.length} records`);
+    } catch {
+      toast.error("Failed to generate CSV report");
+    } finally {
+      setReportLoading(false);
+    }
+  }, [fetchAllReportRows, buildReportRows]);
+
+  const handleExportPdf = useCallback(async () => {
+    setReportLoading(true);
+    try {
+      const items = await fetchAllReportRows();
+      const rows = buildReportRows(items);
+      const totalAmount = items.reduce(
+        (sum, d) => sum + (typeof d.amount === "number" ? d.amount : 0),
+        0,
+      );
+      const approved = items.filter((d) => d.status === "APPROVED").length;
+      const pending = items.filter((d) => d.status === "PENDING").length;
+      const rejected = items.filter((d) => d.status === "REJECTED").length;
+      downloadPdfReport({
+        title: "Deposit Requests Report",
+        filename: `deposits-report-${new Date().toISOString().slice(0, 10)}.pdf`,
+        subtitle: "All deposit requests matching current filters",
+        filterSummary: reportFilterSummary(),
+        summaryCards: [
+          { label: "Total Records", value: String(rows.length) },
+          { label: "Total Amount", value: `$${totalAmount.toLocaleString()}` },
+          { label: "Approved", value: String(approved) },
+          { label: "Pending", value: String(pending) },
+          { label: "Rejected", value: String(rejected) },
+        ],
+        columns: REPORT_COLUMNS,
+        rows,
+      });
+      toast.success(`PDF report ready — ${rows.length} records`);
+    } catch {
+      toast.error("Failed to generate PDF report");
+    } finally {
+      setReportLoading(false);
+    }
+  }, [fetchAllReportRows, buildReportRows, reportFilterSummary]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -274,13 +443,20 @@ export default function AllDeposit() {
             Manage and review all deposit requests
           </p>
         </div>
-        <Link
-          href="/admin/users/users-funds/create"
-          className="inline-flex w-fit self-start shrink-0 items-center justify-center rounded-lg px-2.5 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-sm font-semibold text-white whitespace-nowrap bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
-        >
-          <Plus size={14} />
-          Deposit
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <ReportExportButtons
+            onCsv={handleExportCsv}
+            onPdf={handleExportPdf}
+            loading={reportLoading}
+          />
+          <Link
+            href="/admin/users/users-funds/create"
+            className="inline-flex w-fit self-start shrink-0 items-center justify-center rounded-lg px-2.5 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-sm font-semibold text-white whitespace-nowrap bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+          >
+            <Plus size={14} />
+            Deposit
+          </Link>
+        </div>
       </div>
 
       {/* FILTERS & SEARCH */}
@@ -618,6 +794,28 @@ export default function AllDeposit() {
                         >
                           {d.status}
                         </span>
+                        {(() => {
+                          const ab = d.actionBy;
+                          const actor =
+                            ab && typeof ab === "object"
+                              ? ab
+                              : null;
+                          const actorName = actor?.name || null;
+                          const actorEmail = actor?.email || null;
+                          if (!actorName && !actorEmail) return null;
+                          return (
+                            <div className="mt-1 text-[10px] leading-tight text-[var(--text-muted)]">
+                              <div className="font-medium text-[var(--foreground)]">
+                                {actorName || "--"}
+                              </div>
+                              {actorEmail && (
+                                <div className="truncate max-w-[140px]">
+                                  {actorEmail}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* ACTIONS */}

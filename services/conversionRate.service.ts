@@ -2,7 +2,9 @@ import api from "@/api/axios";
 
 export type ConversionRatesPayload = {
   usdtInr: number;
+  usdtInrWithdraw: number;
   btcUsdt: number;
+  btcUsdtWithdraw: number;
 };
 
 export type ConversionRatesData = ConversionRatesPayload & {

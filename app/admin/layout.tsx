@@ -9,6 +9,7 @@ import { ClickSoundProvider } from "./components/ClickSoundProvider";
 import { useAdminMe } from "@/hooks/useAdmin";
 import GlobalLoader from "./components/ui/GlobalLoader";
 import CustomCursor from "./components/CustomCursor";
+import PermissionGuard from "./components/PermissionGuard";
 
 export default function AdminLayout({
   children,
@@ -85,7 +86,9 @@ export default function AdminLayout({
               width: "calc(100% - var(--sidebar-width))",
             }}
           >
-            <div className="min-w-0 w-full max-w-full">{children}</div>
+            <div className="min-w-0 w-full max-w-full">
+              <PermissionGuard>{children}</PermissionGuard>
+            </div>
           </main>
         </div>
       </div>

@@ -44,16 +44,6 @@ function formatNumber(value?: number, digits = 2) {
   });
 }
 
-function getDefaultFromDate() {
-  const date = new Date();
-  return date.toISOString().slice(0, 10);
-}
-
-function getDefaultToDate() {
-  const date = new Date();
-  return date.toISOString().slice(0, 10);
-}
-
 function getStatusMeta(status?: string) {
   const normalized = (status ?? "").toUpperCase();
   if (normalized === "SUCCESS") {
@@ -89,12 +79,12 @@ export default function SwapTransactionsPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
 
-  const [draftFrom, setDraftFrom] = useState(getDefaultFromDate);
-  const [draftTo, setDraftTo] = useState(getDefaultToDate);
+  const [draftFrom, setDraftFrom] = useState("");
+  const [draftTo, setDraftTo] = useState("");
   const [draftDirection, setDraftDirection] = useState<SwapDirection>("all");
 
-  const [fromDate, setFromDate] = useState(getDefaultFromDate);
-  const [toDate, setToDate] = useState(getDefaultToDate);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [direction, setDirection] = useState<SwapDirection>("all");
 
   const swapQuery = useAdminSwapTransactions({
@@ -123,13 +113,11 @@ export default function SwapTransactionsPage() {
   };
 
   const resetFilters = () => {
-    const nextFrom = getDefaultFromDate();
-    const nextTo = getDefaultToDate();
-    setDraftFrom(nextFrom);
-    setDraftTo(nextTo);
+    setDraftFrom("");
+    setDraftTo("");
     setDraftDirection("all");
-    setFromDate(nextFrom);
-    setToDate(nextTo);
+    setFromDate("");
+    setToDate("");
     setDirection("all");
     setPage(1);
   };

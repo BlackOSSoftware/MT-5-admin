@@ -336,6 +336,10 @@ export default function PendingOrdersPage() {
           payload.takeProfit === undefined
             ? undefined
             : (payload.takeProfit as number | null),
+        createdAt:
+          payload.createdAt === undefined
+            ? undefined
+            : (payload.createdAt as string | null),
       },
       {
         onSuccess: () => {
@@ -858,6 +862,7 @@ export default function PendingOrdersPage() {
                 price: editOrder.price,
                 stopLoss: editOrder.stopLoss,
                 takeProfit: editOrder.takeProfit,
+                createdAt: editOrder.createdAt,
               }
             : null
         }

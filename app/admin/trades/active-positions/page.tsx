@@ -411,6 +411,10 @@ export default function ActivePositionsPage() {
           payload.takeProfit === undefined
             ? undefined
             : (payload.takeProfit as number | null),
+        openTime:
+          payload.openTime === undefined
+            ? undefined
+            : (payload.openTime as string | null),
       },
       {
         onSuccess: () => {
@@ -988,6 +992,7 @@ export default function ActivePositionsPage() {
                 openPrice: positionAction.openPrice,
                 stopLoss: positionAction.stopLoss,
                 takeProfit: positionAction.takeProfit,
+                openTime: positionAction.openTime,
               }
             : null
         }

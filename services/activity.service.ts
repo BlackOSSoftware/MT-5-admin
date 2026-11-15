@@ -56,6 +56,11 @@ export const fetchAdminActivityLogs = async (
   };
 
   if (before) query.before = before;
+  if (params.actorType) query.actorType = params.actorType;
+  if (params.category) query.category = params.category;
+  if (params.status) query.status = params.status;
+  if (params.from) query.from = params.from;
+  if (params.to) query.to = params.to;
 
   const url = userId ? `/activity/admin/${userId}` : "/activity/admin";
   const res = await api.get<ActivityPayload>(url, { params: query });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Activity,
   AtSign,
@@ -15,6 +15,7 @@ import {
   UserCircle2,
 } from "lucide-react";
 import { useAdminActivityLogs } from "@/hooks/useAdminActivityLogs";
+import { fetchAdminActivityLogs } from "@/services/activity.service";
 import type { AdminActivityLog } from "@/types/activity";
 import GlobalLoader from "../components/ui/GlobalLoader";
 import DragScroll from "../components/ui/DragScroll";
@@ -79,6 +80,13 @@ export default function ActivityLogsPage() {
   const [search, setSearch] = useState("");
   const [userIdInput, setUserIdInput] = useState("");
   const [userId, setUserId] = useState<string | undefined>(undefined);
+  const [actorType, setActorType] = useState<string | undefined>(undefined);
+  const [category, setCategory] = useState<string | undefined>(undefined);
+  const [status, setStatus] = useState<string | undefined>(undefined);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [limit, setLimit] = useState(20);
   const [before, setBefore] = useState<string | undefined>(undefined);
 
@@ -104,6 +112,11 @@ export default function ActivityLogsPage() {
     userId,
     limit,
     before,
+    actorType,
+    category,
+    status,
+    from: fromDate || undefined,
+    to: toDate || undefined,
   });
 
   const logs = query.data?.data ?? EMPTY_LOGS;
@@ -133,8 +146,11 @@ export default function ActivityLogsPage() {
         log.user_name,
         log.user_email,
         log.actor_type,
+        log.actor_name,
+        log.actor_email,
         log.actor_id ?? "",
         log.user_id ?? "",
+        log.ip ?? "",
       ]
         .filter(Boolean)
         .join(" ")
@@ -147,6 +163,61 @@ export default function ActivityLogsPage() {
   const handleRefresh = () => {
     setBefore(undefined);
     query.refetch();
+  };
+
+  const handleExportCsv = async () => {
+    setExporting(true);
+    try {
+      const all: AdminActivityLog[] = [];
+      let cursor: string | undefined = undefined;
+      for (let i = 0; i < 30; i++) {
+        const res = await fetchAdminActivityLogs({
+          limit: 100,
+          before: cursor,
+          actorType,
+          category,
+          status,
+          from: fromDate || undefined,
+          to: toDate || undefined,
+        });
+        const items = res.data ?? [];
+        all.push(...items);
+        if (!res.nextCursor || items.length === 0) break;
+        cursor = res.nextCursor;
+      }
+
+      const esc = (v: unknown) => {
+        const s = v === null || v === undefined ? "" : String(v);
+        return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const header = [
+        "Action", "Category", "User", "Email", "Performed By", "Actor Role",
+        "Actor Email", "Status", "IP Address", "Description", "Time",
+      ];
+      const rows = all.map((l) => [
+        l.action ?? "",
+        l.category ?? "",
+        l.user_name ?? "",
+        l.user_email ?? "",
+        l.actor_name ?? formatLabel(l.actor_type),
+        l.actor_role ?? "",
+        l.actor_email ?? "",
+        l.status ?? "",
+        l.ip ?? "",
+        l.description ?? "",
+        l.createdAt ? new Date(l.createdAt).toISOString() : "",
+      ]);
+      const csv = [header, ...rows].map((r) => r.map(esc).join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `activity-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -254,6 +325,62 @@ export default function ActivityLogsPage() {
           </div>
 
           <div className="flex items-center gap-2 w-full lg:w-auto">
+            <div className="relative w-full lg:w-[170px]">
+              <select
+                value={actorType ?? ""}
+                onChange={(e) => {
+                  setActorType(e.target.value || undefined);
+                  setBefore(undefined);
+                }}
+                className="w-full appearance-none rounded-lg border border-[var(--input-border)] bg-[var(--input-bg)]
+                           px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
+              >
+                <option value="">All actors</option>
+                <option value="ADMIN">Admin actions</option>
+                <option value="SELF">User actions</option>
+                <option value="SYSTEM">System actions</option>
+              </select>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+                v
+              </span>
+            </div>
+            <div className="relative w-full lg:w-[160px]">
+              <select
+                value={category ?? ""}
+                onChange={(e) => {
+                  setCategory(e.target.value || undefined);
+                  setBefore(undefined);
+                }}
+                className="w-full appearance-none rounded-lg border border-[var(--input-border)] bg-[var(--input-bg)]
+                           px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
+              >
+                <option value="">All categories</option>
+                {["AUTH","USER","ACCOUNT","KYC","DEPOSIT","WITHDRAWAL","TRANSFER","TRADE","INQUIRY","NOTIFICATION","ADMIN","SETTINGS","SYSTEM"].map((c) => (
+                  <option key={c} value={c}>{c.charAt(0) + c.slice(1).toLowerCase()}</option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+                v
+              </span>
+            </div>
+            <div className="relative w-full lg:w-[150px]">
+              <select
+                value={status ?? ""}
+                onChange={(e) => {
+                  setStatus(e.target.value || undefined);
+                  setBefore(undefined);
+                }}
+                className="w-full appearance-none rounded-lg border border-[var(--input-border)] bg-[var(--input-bg)]
+                           px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
+              >
+                <option value="">All status</option>
+                <option value="SUCCESS">Success</option>
+                <option value="FAILED">Failed</option>
+              </select>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+                v
+              </span>
+            </div>
             <div className="relative w-full lg:w-[160px]">
               <select
                 value={limit}
@@ -275,6 +402,45 @@ export default function ActivityLogsPage() {
               </span>
             </div>
           </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+            Date range
+          </span>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => { setFromDate(e.target.value); setBefore(undefined); }}
+            className="rounded-lg bg-[var(--input-bg)] border border-[var(--input-border)] px-3 py-1.5 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
+          />
+          <span className="text-[var(--text-muted)] text-sm">to</span>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => { setToDate(e.target.value); setBefore(undefined); }}
+            className="rounded-lg bg-[var(--input-bg)] border border-[var(--input-border)] px-3 py-1.5 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
+          />
+          {(fromDate || toDate || category || status || actorType) && (
+            <button
+              type="button"
+              onClick={() => {
+                setFromDate(""); setToDate(""); setCategory(undefined);
+                setStatus(undefined); setActorType(undefined); setBefore(undefined);
+              }}
+              className="rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--text-main)] hover:bg-[var(--hover-bg)]"
+            >
+              Clear filters
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={exporting}
+            className="ml-auto rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--text-main)] hover:bg-[var(--hover-bg)] disabled:opacity-60"
+          >
+            {exporting ? "Exporting..." : "Export CSV"}
+          </button>
         </div>
       </div>
 
@@ -304,6 +470,12 @@ export default function ActivityLogsPage() {
                     Action
                   </span>
                 </th>
+                <th className="w-[120px]">
+                  <span className="inline-flex items-center gap-2">
+                    <Tag size={13} />
+                    Category
+                  </span>
+                </th>
                 <th className="w-[200px]">
                   <span className="inline-flex items-center gap-2">
                     <User size={13} />
@@ -316,10 +488,16 @@ export default function ActivityLogsPage() {
                     Email
                   </span>
                 </th>
-                <th className="w-[140px]">
+                <th className="w-[180px]">
                   <span className="inline-flex items-center gap-2">
                     <ShieldCheck size={13} />
-                    Actor
+                    Performed By
+                  </span>
+                </th>
+                <th className="w-[140px]">
+                  <span className="inline-flex items-center gap-2">
+                    <Fingerprint size={13} />
+                    IP Address
                   </span>
                 </th>
                 <th className="w-[200px]">
@@ -333,19 +511,19 @@ export default function ActivityLogsPage() {
             <tbody>
               {isInitialLoading ? (
                 <tr>
-                  <td colSpan={7} className="py-10 text-center">
+                  <td colSpan={8} className="py-10 text-center">
                     <GlobalLoader />
                   </td>
                 </tr>
               ) : query.isError ? (
                 <tr>
-                  <td colSpan={7} className="py-10 text-center text-sm text-[var(--danger)]">
+                  <td colSpan={8} className="py-10 text-center text-sm text-[var(--danger)]">
                     Failed to load activity logs. Please try again.
                   </td>
                 </tr>
               ) : filteredLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center">
+                  <td colSpan={8} className="py-12 text-center">
                     <div className="space-y-2">
                       <div className="w-14 h-14 bg-[var(--hover-bg)] rounded-xl flex items-center justify-center mx-auto">
                         <Clock3 className="w-6 h-6 text-[var(--text-muted)]" />
@@ -360,14 +538,30 @@ export default function ActivityLogsPage() {
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map((log, index) => (
-                  <tr key={log._id ?? `${index}`} className="hover:bg-[var(--hover-bg)]">
+                filteredLogs.map((log, index) => {
+                  const rowKey = log._id ?? `${index}`;
+                  const expanded = expandedId === rowKey;
+                  return (
+                  <Fragment key={rowKey}>
+                  <tr
+                    key={rowKey}
+                    onClick={() => setExpandedId(expanded ? null : rowKey)}
+                    className="hover:bg-[var(--hover-bg)] cursor-pointer"
+                  >
                     <td className="text-[var(--text-muted)]">
                       {index + 1}
                     </td>
                     <td>
                       <span className={`pill text-xs font-medium ${actionTone(log.action)}`}>
                         {formatLabel(log.action)}
+                      </span>
+                      {log.status === "FAILED" && (
+                        <span className="pill pill-danger text-[10px] ml-1">Failed</span>
+                      )}
+                    </td>
+                    <td>
+                      <span className="pill pill-muted text-[10px]">
+                        {formatLabel(log.category ?? undefined) || "--"}
                       </span>
                     </td>
                     <td>
@@ -379,15 +573,69 @@ export default function ActivityLogsPage() {
                       {log.user_email || "--"}
                     </td>
                     <td>
-                      <span className={`pill text-xs font-medium ${actorTone(log.actor_type)}`}>
-                        {formatLabel(log.actor_type)}
-                      </span>
+                      <div className="flex flex-col">
+                        <span className="font-semibold">
+                          {log.actor_name || formatLabel(log.actor_type)}
+                        </span>
+                        {log.actor_role && (
+                          <span className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                            {formatLabel(log.actor_role)}
+                          </span>
+                        )}
+                        {log.actor_email && (
+                          <span className="text-xs text-[var(--text-muted)]">
+                            {log.actor_email}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="text-[var(--text-muted)] font-mono text-xs">
+                      {log.ip || "--"}
                     </td>
                     <td className="text-[var(--text-muted)] whitespace-nowrap">
                       {formatDateTime(log.createdAt)}
                     </td>
                   </tr>
-                ))
+                  {expanded && (
+                    <tr key={`${rowKey}-detail`} className="bg-[var(--hover-bg)]/50">
+                      <td colSpan={8} className="px-4 py-3">
+                        <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
+                          {log.description && (
+                            <div>
+                              <span className="font-semibold text-[var(--foreground)]">Description: </span>
+                              <span className="text-[var(--text-muted)]">{log.description}</span>
+                            </div>
+                          )}
+                          {log.target_entity_type && (
+                            <div>
+                              <span className="font-semibold text-[var(--foreground)]">Entity: </span>
+                              <span className="text-[var(--text-muted)]">
+                                {formatLabel(log.target_entity_type)}
+                                {log.target_entity_id ? ` (${shortId(log.target_entity_id)})` : ""}
+                              </span>
+                            </div>
+                          )}
+                          {log.user_agent && (
+                            <div className="sm:col-span-2">
+                              <span className="font-semibold text-[var(--foreground)]">User Agent: </span>
+                              <span className="text-[var(--text-muted)] break-all">{log.user_agent}</span>
+                            </div>
+                          )}
+                          {log.metadata && Object.keys(log.metadata).length > 0 && (
+                            <div className="sm:col-span-2 lg:col-span-4">
+                              <span className="font-semibold text-[var(--foreground)]">Metadata: </span>
+                              <code className="text-[10px] text-[var(--text-muted)] break-all">
+                                {JSON.stringify(log.metadata)}
+                              </code>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>

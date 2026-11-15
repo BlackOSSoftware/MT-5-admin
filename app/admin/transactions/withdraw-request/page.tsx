@@ -29,15 +29,23 @@ import {
 import { useAdminWithdrawals } from "@/hooks/withdrawals/useWithdrawals";
 import Pagination from "../../components/ui/pagination";
 import DragScroll from "../../components/ui/DragScroll";
+import ReportExportButtons from "../../components/ui/ReportExportButtons";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import type {
-  WithdrawalMethod,
-  WithdrawalSortBy,
-  WithdrawalStatus,
-  SortDir,
+import {
+  getAdminWithdrawals,
+  type WithdrawalMethod,
+  type WithdrawalSortBy,
+  type WithdrawalStatus,
+  type SortDir,
 } from "@/services/adminWithdrawal.service";
+import {
+  downloadCsv,
+  downloadPdfReport,
+  type ReportColumn,
+  type ReportRow,
+} from "@/utils/reportExport";
 
 type WithdrawalRow = {
   _id: string;
@@ -71,6 +79,9 @@ type WithdrawalRow = {
     crypto_network?: string;
     crypto_address?: string;
     note?: string;
+    converted_amount?: number | null;
+    converted_currency?: string;
+    conversion_rate?: number | null;
   };
 };
 
@@ -118,6 +129,89 @@ const formatTime = (value?: string) => {
   });
 };
 
+const formatDateTime = (value?: string) => {
+  if (!value) return "--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--";
+  return `${date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })}, ${date.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
+};
+
+const REPORT_COLUMNS: ReportColumn[] = [
+  { key: "id", label: "Withdrawal ID" },
+  { key: "userName", label: "User Name" },
+  { key: "userEmail", label: "Email" },
+  { key: "accountNo", label: "Account No" },
+  { key: "plan", label: "Plan" },
+  { key: "amount", label: "Amount", align: "right" },
+  { key: "method", label: "Method" },
+  { key: "payout", label: "Payout Details" },
+  { key: "status", label: "Status" },
+  { key: "createdAt", label: "Requested At" },
+  { key: "actionAt", label: "Action At" },
+  { key: "rejectionReason", label: "Rejection Reason" },
+];
+
+const getStr = (v: unknown): string =>
+  v === null || v === undefined ? "" : String(v);
+
+const CURRENCY_PREFIX: Record<string, string> = {
+  INR: "₹",
+  USD: "$",
+  USDT: "USDT ",
+  BTC: "₿",
+};
+
+const formatConverted = (p?: WithdrawalRow["payout"]): string => {
+  if (!p || p.converted_amount === null || p.converted_amount === undefined) {
+    return "";
+  }
+  const cur = String(p.converted_currency || "").toUpperCase();
+  const prefix = CURRENCY_PREFIX[cur] ?? `${cur} `;
+  const digits = cur === "BTC" ? 8 : 2;
+  const value = Number(p.converted_amount).toLocaleString("en-IN", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+  const rate =
+    p.conversion_rate !== null && p.conversion_rate !== undefined
+      ? ` @ ${p.conversion_rate}`
+      : "";
+  return ` → ${prefix}${value}${rate}`;
+};
+
+const payoutSummary = (w: WithdrawalRow): string => {
+  const p = w.payout;
+  if (!p) return "--";
+  const m = (w.method ?? "").toUpperCase();
+  const conv = formatConverted(p);
+  if (m === "UPI" && p.upi_id) return `UPI: ${p.upi_id}${conv}`;
+  if ((m === "BANK" || m === "INDIAN_BANK") && (p.bank_name || p.account_number)) {
+    return (
+      [p.bank_name, p.account_holder_name, p.account_number, p.ifsc]
+        .filter(Boolean)
+        .join(" | ") + conv
+    );
+  }
+  if (
+    (m === "CRYPTO" || m === "USDT" || m === "BITCOIN" || m === "NETELLER" || m === "SKRILL") &&
+    (p.crypto_address || p.crypto_network || p.email)
+  ) {
+    const addr = [p.crypto_network, p.crypto_address || p.email]
+      .filter(Boolean)
+      .join(" ");
+    const base = addr.length > 60 ? `${addr.slice(0, 57)}...` : addr || "--";
+    return base + conv;
+  }
+  return (p.note || "--") + conv;
+};
+
 export default function AllWithdrawals() {
   const router = useRouter();
   const [page, setPage] = useState(1);
@@ -132,6 +226,7 @@ export default function AllWithdrawals() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [selected, setSelected] = useState<WithdrawalRow | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [reportLoading, setReportLoading] = useState(false);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -220,6 +315,114 @@ export default function AllWithdrawals() {
     setRejectReason("");
   }, []);
 
+  const buildReportRows = useCallback((items: WithdrawalRow[]): ReportRow[] => {
+    return items.map((w) => {
+      const extra = w as unknown as Record<string, unknown>;
+      return {
+        id: getStr(w._id).slice(-8).toUpperCase(),
+        userName: getStr(w.user?.name) || "--",
+        userEmail: getStr(w.user?.email) || "--",
+        accountNo: getStr(w.account?.account_number) || "--",
+        plan: getStr(w.account?.plan_name) || getStr(w.account?.account_type) || "--",
+        amount: typeof w.amount === "number" ? `$${w.amount.toLocaleString()}` : "--",
+        method: getStr(w.method) || "--",
+        payout: payoutSummary(w),
+        status: getStr(w.status) || "--",
+        createdAt: formatDateTime(w.createdAt),
+        actionAt: formatDateTime(w.actionAt || getStr(extra.actionAt) || undefined),
+        rejectionReason: getStr(extra.rejectionReason) || "--",
+      };
+    });
+  }, []);
+
+  const fetchAllReportRows = useCallback(async (): Promise<WithdrawalRow[]> => {
+    const all: WithdrawalRow[] = [];
+    let pageNum = 1;
+    const pageSize = 100;
+    for (let i = 0; i < 50; i += 1) {
+      const res = await getAdminWithdrawals({
+        page: pageNum,
+        limit: pageSize,
+        status,
+        q: q || undefined,
+        method: method || undefined,
+        fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
+        sortBy,
+        sortDir,
+      });
+      const batch = (res.data as WithdrawalRow[]) ?? [];
+      all.push(...batch);
+      const totalPages = res.totalPages ?? Math.ceil((res.total || 0) / pageSize);
+      if (batch.length < pageSize || pageNum >= totalPages) break;
+      pageNum += 1;
+    }
+    return all;
+  }, [status, q, method, fromDate, toDate, sortBy, sortDir]);
+
+  const reportFilterSummary = useCallback(() => {
+    const items: Array<{ label: string; value: string }> = [];
+    items.push({ label: "Status", value: status || "All" });
+    items.push({ label: "Method", value: method || "All" });
+    if (q) items.push({ label: "Search", value: q });
+    if (fromDate) items.push({ label: "From", value: fromDate });
+    if (toDate) items.push({ label: "To", value: toDate });
+    items.push({ label: "Sort", value: `${sortBy} (${sortDir})` });
+    return items;
+  }, [status, method, q, fromDate, toDate, sortBy, sortDir]);
+
+  const handleExportCsv = useCallback(async () => {
+    setReportLoading(true);
+    try {
+      const items = await fetchAllReportRows();
+      const rows = buildReportRows(items);
+      const stamp = new Date().toISOString().slice(0, 10);
+      downloadCsv(`withdrawals-report-${stamp}.csv`, REPORT_COLUMNS, rows);
+      toast.success(`CSV downloaded — ${rows.length} records`);
+    } catch {
+      toast.error("Failed to generate CSV report");
+    } finally {
+      setReportLoading(false);
+    }
+  }, [fetchAllReportRows, buildReportRows]);
+
+  const handleExportPdf = useCallback(async () => {
+    setReportLoading(true);
+    try {
+      const items = await fetchAllReportRows();
+      const rows = buildReportRows(items);
+      const totalAmount = items.reduce(
+        (sum, w) => sum + (typeof w.amount === "number" ? w.amount : 0),
+        0,
+      );
+      const approved = items.filter(
+        (w) => w.status === "APPROVED" || w.status === "COMPLETED",
+      ).length;
+      const pending = items.filter((w) => w.status === "PENDING").length;
+      const rejected = items.filter((w) => w.status === "REJECTED").length;
+      downloadPdfReport({
+        title: "Withdrawal Requests Report",
+        filename: `withdrawals-report-${new Date().toISOString().slice(0, 10)}.pdf`,
+        subtitle: "All withdrawal requests matching current filters",
+        filterSummary: reportFilterSummary(),
+        summaryCards: [
+          { label: "Total Records", value: String(rows.length) },
+          { label: "Total Amount", value: `$${totalAmount.toLocaleString()}` },
+          { label: "Approved", value: String(approved) },
+          { label: "Pending", value: String(pending) },
+          { label: "Rejected", value: String(rejected) },
+        ],
+        columns: REPORT_COLUMNS,
+        rows,
+      });
+      toast.success(`PDF report ready — ${rows.length} records`);
+    } catch {
+      toast.error("Failed to generate PDF report");
+    } finally {
+      setReportLoading(false);
+    }
+  }, [fetchAllReportRows, buildReportRows, reportFilterSummary]);
+
   const handleApprove = useCallback(async () => {
     if (!selected) return;
 
@@ -268,13 +471,20 @@ export default function AllWithdrawals() {
             Review and manage withdrawal requests
           </p>
         </div>
-        <Link
-          href="/admin/users/users-funds/create?type=Withdrawal"
-          className="inline-flex w-fit self-start shrink-0 items-center justify-center rounded-lg px-2.5 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-sm font-semibold text-white whitespace-nowrap bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700"
-        >
-          <HandCoins size={14} />
-          Withdrawal
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <ReportExportButtons
+            onCsv={handleExportCsv}
+            onPdf={handleExportPdf}
+            loading={reportLoading}
+          />
+          <Link
+            href="/admin/users/users-funds/create?type=Withdrawal"
+            className="inline-flex w-fit self-start shrink-0 items-center justify-center rounded-lg px-2.5 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-sm font-semibold text-white whitespace-nowrap bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700"
+          >
+            <HandCoins size={14} />
+            Withdrawal
+          </Link>
+        </div>
       </div>
 
       {/* FILTERS & SEARCH */}
@@ -786,6 +996,13 @@ export default function AllWithdrawals() {
                     selected.payout?.note) && (
                     <div className="rounded-xl border border-[var(--card-border)] bg-[var(--input-bg)] p-3 sm:p-4 space-y-2">
                       <p className="text-xs font-medium text-[var(--text-muted)]">Payout Details</p>
+                      {selected.payout?.converted_amount !== null &&
+                        selected.payout?.converted_amount !== undefined && (
+                          <p className="text-sm">
+                            <span className="font-semibold">Payout Amount:</span>{" "}
+                            {formatConverted(selected.payout)}
+                          </p>
+                        )}
                       {selected.payout?.upi_id && (
                         <p className="text-sm"><span className="font-semibold">UPI:</span> {selected.payout.upi_id}</p>
                       )}

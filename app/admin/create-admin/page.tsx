@@ -5,11 +5,18 @@ import { useRouter } from "next/navigation";
 import { Pencil, Plus, RefreshCcw, Shield, UserPlus, X } from "lucide-react";
 import {
   createAdmin,
+  deleteBrokerStaffMembership,
+  deleteMembership,
+  inviteBrokerStaff,
   listAdmins,
+  listBrokerStaff,
+  listBrokerStaffPermissions,
   listPermissions,
+  updateBrokerStaffMembership,
   updateMembership,
   type PlatformAdmin,
 } from "@/services/platform/platform.services";
+import adminService from "@/services/admin.service";
 import GlobalLoader from "../components/ui/GlobalLoader";
 
 const PERM_LABELS: Record<string, string> = {
@@ -30,6 +37,16 @@ const PERM_LABELS: Record<string, string> = {
   "admins.manage": "Manage staff",
   "reports.export": "Export reports",
   "reports.client_positions": "Client position report",
+  "finance.deposit.read": "View deposits",
+  "finance.withdrawal.read": "View withdrawals",
+  "finance.transactions.read": "View transactions",
+  "finance.wallet.adjust": "Adjust wallet",
+  "settings.risk": "Risk settings",
+  "conversion.manage": "Conversion rates",
+  "notifications.send": "Send notifications",
+  "inquiry.manage": "Manage inquiries",
+  "activity.read": "View activity logs",
+  "instruments.manage": "Manage instruments",
 };
 
 function permLabel(key: string) {
@@ -47,6 +64,8 @@ function statusClass(status: string) {
 export default function AdminsPage() {
   const router = useRouter();
   const [allowed, setAllowed] = useState(false);
+  const [mode, setMode] = useState<"super" | "broker">("super");
+  const [myPermissions, setMyPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<PlatformAdmin[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
@@ -60,11 +79,14 @@ export default function AdminsPage() {
     setTimeout(() => setToast(""), 3500);
   };
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (m: "super" | "broker" = mode) => {
     setLoading(true);
     setErr("");
     try {
-      const [aRes, pRes] = await Promise.all([listAdmins(), listPermissions()]);
+      const [aRes, pRes] =
+        m === "super"
+          ? await Promise.all([listAdmins(), listPermissions()])
+          : await Promise.all([listBrokerStaff(), listBrokerStaffPermissions()]);
       setRows(aRes.data || []);
       setPermissions(pRes.data || []);
     } catch (e: unknown) {
@@ -76,16 +98,51 @@ export default function AdminsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [mode]);
 
   useEffect(() => {
-    if (localStorage.getItem("platformRole") !== "SUPER_ADMIN") {
-      router.replace("/admin");
-      return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const me = await adminService.getMe();
+        if (cancelled) return;
+        if (me?.platformRole === "SUPER_ADMIN") {
+          setMode("super");
+          setAllowed(true);
+          refresh("super");
+          return;
+        }
+        const perms: string[] = me?.permissions ?? [];
+        if (perms.includes("admins.manage") || perms.includes("*")) {
+          setMode("broker");
+          setMyPermissions(perms);
+          setAllowed(true);
+          refresh("broker");
+          return;
+        }
+        router.replace("/admin");
+      } catch {
+        if (!cancelled) router.replace("/admin");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router]);
+
+  const handleDelete = async (row: PlatformAdmin) => {
+    if (!window.confirm(`Delete ${row.user?.email || "this account"}?`)) return;
+    try {
+      if (mode === "super") await deleteMembership(row._id);
+      else await deleteBrokerStaffMembership(row._id);
+      showToast(`Deleted ${row.user?.email || "account"}`);
+      await refresh(mode);
+    } catch (e: unknown) {
+      const ax = e as { response?: { data?: { message?: string } }; message?: string };
+      showToast(ax?.response?.data?.message || ax?.message || "Delete failed");
     }
-    setAllowed(true);
-    refresh();
-  }, [router, refresh]);
+  };
 
   const stats = useMemo(() => {
     const active = rows.filter((r) => r.status === "ACTIVE").length;
@@ -116,13 +173,15 @@ export default function AdminsPage() {
             Admins
           </h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Create and manage admins. Each admin only sees their own data.
+            {mode === "super"
+              ? "Create and manage admins. Each admin only sees their own data."
+              : "Create and manage your sub-admins. They only see pages you allow."}
           </p>
         </div>
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => refresh()}
+            onClick={() => refresh(mode)}
             className="inline-flex items-center gap-2 rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)] px-3 py-2.5 text-sm hover:bg-[var(--hover-bg)]"
           >
             <RefreshCcw size={16} />
@@ -208,14 +267,23 @@ export default function AdminsPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setEditRow(row)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-[var(--card-border)] px-2.5 py-1.5 text-xs hover:bg-[var(--hover-bg)]"
-                    >
-                      <Pencil size={14} />
-                      Edit
-                    </button>
+                    <div className="inline-flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setEditRow(row)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-[var(--card-border)] px-2.5 py-1.5 text-xs hover:bg-[var(--hover-bg)]"
+                      >
+                        <Pencil size={14} />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(row)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-red-500/30 px-2.5 py-1.5 text-xs text-red-600 hover:bg-red-500/10"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -237,11 +305,13 @@ export default function AdminsPage() {
       {createOpen && (
         <CreateAdminModal
           permissions={permissions}
+          allowedPermissions={mode === "broker" ? myPermissions : permissions}
+          mode={mode}
           onClose={() => setCreateOpen(false)}
           onDone={async (message) => {
             setCreateOpen(false);
             showToast(message);
-            await refresh();
+            await refresh(mode);
           }}
         />
       )}
@@ -250,11 +320,13 @@ export default function AdminsPage() {
         <EditAdminModal
           row={editRow}
           permissions={permissions}
+          allowedPermissions={mode === "broker" ? myPermissions : permissions}
+          mode={mode}
           onClose={() => setEditRow(null)}
           onDone={async (message) => {
             setEditRow(null);
             showToast(message);
-            await refresh();
+            await refresh(mode);
           }}
         />
       )}
@@ -301,15 +373,18 @@ function ModalShell({
 
 function PermissionGrid({
   permissions,
+  allowed,
   selected,
   onChange,
 }: {
   permissions: string[];
+  allowed?: string[];
   selected: string[];
   onChange: (next: string[]) => void;
 }) {
+  const selectable = allowed ?? permissions;
   const allSelected =
-    permissions.length > 0 && selected.length === permissions.length;
+    selectable.length > 0 && selectable.every((p) => selected.includes(p));
 
   return (
     <div className="space-y-2">
@@ -318,35 +393,52 @@ function PermissionGrid({
         <button
           type="button"
           className="text-xs font-medium text-[var(--primary)]"
-          onClick={() => onChange(allSelected ? [] : [...permissions])}
+          onClick={() =>
+            onChange(allSelected ? [] : selectable.filter((p) => permissions.includes(p)))
+          }
         >
           {allSelected ? "Clear all" : "Select all"}
         </button>
       </div>
       <p className="text-xs text-[var(--text-muted)]">
-        If none are selected, full access is granted.
+        {allowed
+          ? "You can only grant permissions you have yourself."
+          : "If none are selected, full access is granted."}
       </p>
       <div className="grid max-h-52 gap-2 overflow-auto rounded-xl border border-[var(--card-border)] p-3 sm:grid-cols-2">
-        {permissions.map((p) => (
-          <label
-            key={p}
-            className="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-[var(--hover-bg)]"
-          >
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={selected.includes(p)}
-              onChange={() =>
-                onChange(
-                  selected.includes(p)
-                    ? selected.filter((x) => x !== p)
-                    : [...selected, p]
-                )
-              }
-            />
-            <span className="font-medium">{permLabel(p)}</span>
-          </label>
-        ))}
+        {permissions.map((p) => {
+          const canGrant = selectable.includes(p);
+          return (
+            <label
+              key={p}
+              className={`flex items-start gap-2 rounded-lg px-2 py-1.5 text-sm ${
+                canGrant ? "cursor-pointer hover:bg-[var(--hover-bg)]" : "opacity-40"
+              }`}
+            >
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                disabled={!canGrant}
+                checked={selected.includes(p)}
+                onChange={() =>
+                  onChange(
+                    selected.includes(p)
+                      ? selected.filter((x) => x !== p)
+                      : [...selected, p]
+                  )
+                }
+              />
+              <span className="font-medium">
+                {permLabel(p)}
+                {!canGrant && (
+                  <span className="ml-1 text-[10px] text-[var(--text-muted)]">
+                    (not yours)
+                  </span>
+                )}
+              </span>
+            </label>
+          );
+        })}
       </div>
     </div>
   );
@@ -354,19 +446,25 @@ function PermissionGrid({
 
 function CreateAdminModal({
   permissions,
+  allowedPermissions,
+  mode,
   onClose,
   onDone,
 }: {
   permissions: string[];
+  allowedPermissions: string[];
+  mode: "super" | "broker";
   onClose: () => void;
   onDone: (message: string) => Promise<void>;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [selectedPerms, setSelectedPerms] = useState<string[]>([
-    ...permissions,
-  ]);
+  const [selectedPerms, setSelectedPerms] = useState<string[]>(() => {
+    // Broker admins must explicitly pick — never pre-grant everything.
+    if (mode === "broker") return [];
+    return permissions.filter((p) => (allowedPermissions ?? permissions).includes(p));
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -375,12 +473,23 @@ function CreateAdminModal({
     setError("");
     setBusy(true);
     try {
-      const res = await createAdmin({
-        email: email.trim().toLowerCase(),
-        name: name.trim() || undefined,
-        password: password || undefined,
-        permissions: selectedPerms.length ? selectedPerms : undefined,
-      });
+      const res =
+        mode === "super"
+          ? await createAdmin({
+              email: email.trim().toLowerCase(),
+              name: name.trim() || undefined,
+              password: password || undefined,
+              permissions: selectedPerms.length ? selectedPerms : undefined,
+            })
+          : await inviteBrokerStaff({
+              email: email.trim().toLowerCase(),
+              name: name.trim() || undefined,
+              password: password || undefined,
+              // Only send perms the admin actually has (backend clamps too).
+              permissions: selectedPerms.filter((p) =>
+                allowedPermissions.includes(p)
+              ),
+            });
       const temp = res.data?.temporaryPassword;
       await onDone(
         temp
@@ -438,6 +547,7 @@ function CreateAdminModal({
 
         <PermissionGrid
           permissions={permissions}
+          allowed={allowedPermissions}
           selected={selectedPerms}
           onChange={setSelectedPerms}
         />
@@ -472,16 +582,22 @@ function CreateAdminModal({
 function EditAdminModal({
   row,
   permissions,
+  allowedPermissions,
+  mode,
   onClose,
   onDone,
 }: {
   row: PlatformAdmin;
   permissions: string[];
+  allowedPermissions: string[];
+  mode: "super" | "broker";
   onClose: () => void;
   onDone: (message: string) => Promise<void>;
 }) {
-  const [selectedPerms, setSelectedPerms] = useState<string[]>(
-    row.permissions || []
+  const [selectedPerms, setSelectedPerms] = useState<string[]>(() =>
+    mode === "broker"
+      ? (row.permissions || []).filter((p) => allowedPermissions.includes(p))
+      : row.permissions || []
   );
   const [status, setStatus] = useState(row.status);
   const [busy, setBusy] = useState(false);
@@ -492,10 +608,17 @@ function EditAdminModal({
     setBusy(true);
     setError("");
     try {
-      await updateMembership(row._id, {
-        permissions: selectedPerms,
-        status,
-      });
+      if (mode === "super") {
+        await updateMembership(row._id, {
+          permissions: selectedPerms,
+          status,
+        });
+      } else {
+        await updateBrokerStaffMembership(row._id, {
+          permissions: selectedPerms,
+          status,
+        });
+      }
       await onDone(`Updated ${row.user?.email || "admin"}`);
     } catch (ex: unknown) {
       const ax = ex as {
@@ -529,6 +652,7 @@ function EditAdminModal({
 
         <PermissionGrid
           permissions={permissions}
+          allowed={allowedPermissions}
           selected={selectedPerms}
           onChange={setSelectedPerms}
         />

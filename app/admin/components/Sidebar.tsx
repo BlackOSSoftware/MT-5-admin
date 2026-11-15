@@ -36,13 +36,14 @@ import {
   UserPlus,
   BarChart3,
   Percent,
+  GitBranch,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLogout } from "@/hooks/useAuth";
 import adminService from "@/services/admin.service";
-import { canManageSlippage, canViewClientPositions } from "@/utils/adminPermissions";
+import { hasAnyPermission, type AdminMeLike } from "@/utils/adminPermissions";
 
 /* ================= TYPES ================= */
 
@@ -51,15 +52,13 @@ interface NavItem {
   label: string;
   icon: JSX.Element;
   children?: NavItem[];
+  /** Broker-admin needs ANY of these (SuperAdmin always sees it). */
+  anyOf?: string[];
 }
 
 /* ================= NAV CONFIG ================= */
 
-function buildNavSections(
-  isSuperAdmin: boolean,
-  canViewPositions: boolean,
-  canSlippage: boolean,
-): {
+function buildNavSections(me: AdminMeLike): {
   title: string;
   items: NavItem[];
 }[] {
@@ -75,12 +74,18 @@ function buildNavSections(
           label: "Dashboard",
           icon: <LayoutDashboard size={18} />,
         },
-        ...(isSuperAdmin
+        {
+          href: "/admin/create-admin",
+          label: "Admins",
+          icon: <UserPlus size={18} />,
+          anyOf: ["admins.manage"],
+        },
+        ...(me?.platformRole === "SUPER_ADMIN"
           ? [
               {
-                href: "/admin/create-admin",
-                label: "Admins",
-                icon: <UserPlus size={18} />,
+                href: "/admin/admin-hierarchy",
+                label: "Admin Hierarchy",
+                icon: <GitBranch size={18} />,
               },
             ]
           : []),
@@ -92,6 +97,7 @@ function buildNavSections(
         {
           label: "Instruments",
           icon: <CandlestickChart size={18} />,
+          anyOf: ["instruments.manage"],
           children: [
             { href: "/admin/instruments/market-watch", label: "Market Watch", icon: <Activity size={14} /> },
             { href: "/admin/instruments/manage-scrips", label: "Manage Scrips", icon: <FileText size={14} /> },
@@ -101,43 +107,40 @@ function buildNavSections(
         {
           label: "Trades",
           icon: <ShoppingCart size={18} />,
+          anyOf: ["trading.positions.read", "trading.intervene"],
           children: [
-            { href: "/admin/trades/live/create", label: "Create Trade", icon: <Plus size={14} /> },
-            { href: "/admin/trades/active-positions", label: "Active Positions", icon: <Activity size={14} /> },
-            { href: "/admin/trades/pending-orders", label: "Pending Orders", icon: <Clock3 size={14} /> },
-            { href: "/admin/trades/close-trades", label: "Closed Trades", icon: <UserCheck size={14} /> },
-            { href: "/admin/trades/deleted-trades", label: "Deleted Trades", icon: <Trash2 size={14} /> },
+            { href: "/admin/trades/live/create", label: "Create Trade", icon: <Plus size={14} />, anyOf: ["trading.intervene"] },
+            { href: "/admin/trades/active-positions", label: "Active Positions", icon: <Activity size={14} />, anyOf: ["trading.positions.read"] },
+            { href: "/admin/trades/pending-orders", label: "Pending Orders", icon: <Clock3 size={14} />, anyOf: ["trading.positions.read"] },
+            { href: "/admin/trades/close-trades", label: "Closed Trades", icon: <UserCheck size={14} />, anyOf: ["trading.positions.read"] },
+            { href: "/admin/trades/deleted-trades", label: "Deleted Trades", icon: <Trash2 size={14} />, anyOf: ["trading.positions.read"] },
             {
               href: "/admin/trades/brokerage-commission",
               label: "Brokerage & Commission",
               icon: <DollarSign size={14} />,
+              anyOf: ["trading.positions.read"],
             },
             {
               href: "/admin/risk-settings",
               label: "Stop-out & Warnings",
               icon: <Activity size={14} />,
+              anyOf: ["settings.risk"],
             },
           ],
         },
-        ...(canViewPositions
-          ? [
-              {
-                href: "/admin/trades/client-positions",
-                label: "Position",
-                icon: <BarChart3 size={18} />,
-              },
-            ]
-          : []),
-        { href: "/admin/account-plan", label: "Accounts", icon: <Gift size={18} /> },
-        ...(canSlippage
-          ? [
-              {
-                href: "/admin/slippage-settings",
-                label: "Slippage Settings",
-                icon: <Percent size={18} />,
-              },
-            ]
-          : []),
+        {
+          href: "/admin/trades/client-positions",
+          label: "Position",
+          icon: <BarChart3 size={18} />,
+          anyOf: ["reports.client_positions"],
+        },
+        { href: "/admin/account-plan", label: "Accounts", icon: <Gift size={18} />, anyOf: ["plans.manage"] },
+        {
+          href: "/admin/slippage-settings",
+          label: "Slippage Settings",
+          icon: <Percent size={18} />,
+          anyOf: ["settings.slippage"],
+        },
       ],
     },
     
@@ -147,6 +150,7 @@ function buildNavSections(
         {
           label: "Users",
           icon: <Users size={18} />,
+          anyOf: ["users.read"],
           children: [
             { href: "/admin/users/users", label: "All Users", icon: <Users size={14} /> },
             { href: "/admin/users/users-funds", label: "User Funds", icon: <Wallet size={14} /> },
@@ -155,6 +159,7 @@ function buildNavSections(
         {
           label: "Verification",
           icon: <ShieldCheck size={18} />,
+          anyOf: ["kyc.review"],
           children: [
             { href: "/admin/verification/kyc", label: "KYC Completed", icon: <UserCheck size={14} /> },
           ],
@@ -170,33 +175,55 @@ function buildNavSections(
         {
           label: "Transactions",
           icon: <CreditCard size={18} />,
+          anyOf: [
+            "finance.payment_methods.manage",
+            "finance.withdrawal.read",
+            "finance.withdrawal.approve",
+            "finance.withdrawal.reject",
+            "finance.deposit.read",
+            "finance.deposit.approve",
+            "finance.deposit.reject",
+            "finance.transactions.read",
+          ],
           children: [
-            { href: "/admin/transactions/bank-details", label: "Bank Details", icon: <DollarSign size={14} /> },
-            { href: "/admin/transactions/withdraw-methods", label: "Withdraw Methods", icon: <DollarSign size={14} /> },
-            { href: "/admin/transactions/withdraw-request", label: "Withdraw Requests", icon: <DollarSign size={14} /> },
-            { href: "/admin/transactions/all-deposit", label: "Deposit Requests", icon: <FileText size={14} /> },
-            { href: "/admin/transactions/swap", label: "Swap Transactions", icon: <RefreshCcw size={14} /> },
+            { href: "/admin/transactions/bank-details", label: "Bank Details", icon: <DollarSign size={14} />, anyOf: ["finance.payment_methods.manage"] },
+            { href: "/admin/transactions/withdraw-methods", label: "Withdraw Methods", icon: <DollarSign size={14} />, anyOf: ["finance.payment_methods.manage"] },
+            { href: "/admin/transactions/withdraw-request", label: "Withdraw Requests", icon: <DollarSign size={14} />, anyOf: ["finance.withdrawal.read", "finance.withdrawal.approve", "finance.withdrawal.reject"] },
+            { href: "/admin/transactions/all-deposit", label: "Deposit Requests", icon: <FileText size={14} />, anyOf: ["finance.deposit.read", "finance.deposit.approve", "finance.deposit.reject"] },
+            { href: "/admin/transactions/swap", label: "Swap Transactions", icon: <RefreshCcw size={14} />, anyOf: ["finance.transactions.read"] },
           ],
         },
-        { href: "/admin/dollar-rate", label: "Conversion Rates", icon: <DollarSign size={18} /> },
+        {
+          href: "/admin/dollar-rate",
+          label: "Conversion Rates",
+          icon: <DollarSign size={18} />,
+          anyOf: [
+            "conversion.manage",
+            "finance.deposit.read",
+            "finance.deposit.approve",
+            "finance.withdrawal.read",
+            "finance.withdrawal.approve",
+          ],
+        },
       ],
     },
     {
       title: "System",
       items: [
-        { href: "/admin/activity-logs", label: "Activity Logs", icon: <Activity size={18} /> },
-        { href: "/admin/notifications/notification", label: "Notifications", icon: <Bell size={18} /> },
-        { href: "/admin/inquiry", label: "Inquiry", icon: <MessageSquare size={18} /> },
+        { href: "/admin/activity-logs", label: "Activity Logs", icon: <Activity size={18} />, anyOf: ["activity.read"] },
+        { href: "/admin/notifications/notification", label: "Notifications", icon: <Bell size={18} />, anyOf: ["notifications.send"] },
+        { href: "/admin/inquiry", label: "Inquiry", icon: <MessageSquare size={18} />, anyOf: ["inquiry.manage"] },
         {
           label: "Referral",
           icon: <Gift size={18} />,
+          anyOf: ["settings.referral"],
           children: [
             { href: "/admin/referral", label: "Reward Approvals", icon: <Gift size={14} /> },
+            { href: "/admin/referral/ib-requests", label: "IB Requests", icon: <GitBranch size={14} /> },
             { href: "/admin/referral/network", label: "Network Report", icon: <Users size={14} /> },
-            { href: "/admin/referral/ib-settings", label: "IB Level Settings", icon: <Percent size={14} /> },
-            { href: "/admin/bonus", label: "Bonus", icon: <DollarSign size={14} /> },
           ],
         },
+        { href: "/admin/bonus", label: "Bonus", icon: <DollarSign size={18} />, anyOf: ["settings.bonus"] },
         {
           label: "Account Security",
           icon: <Lock size={18} />,
@@ -212,7 +239,19 @@ function buildNavSections(
     },
   ];
 
-  return sections;
+  // Filter by broker-admin permissions (SuperAdmin sees everything).
+  const visible = (item: NavItem): boolean => {
+    if (item.anyOf && !hasAnyPermission(me, item.anyOf)) return false;
+    if (item.children) {
+      item.children = item.children.filter(visible);
+      return item.children.length > 0;
+    }
+    return true;
+  };
+
+  return sections
+    .map((s) => ({ ...s, items: s.items.filter(visible) }))
+    .filter((s) => s.items.length > 0);
 }
 
 /* ================= COMPONENT ================= */
@@ -226,31 +265,22 @@ export default function AdminSidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [pinnedDropdown, setPinnedDropdown] = useState<string | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [canViewPositions, setCanViewPositions] = useState(false);
-  const [canSlippage, setCanSlippage] = useState(false);
-  const [me, setMe] = useState<{
+  const [me, setMe] = useState<({
     name?: string;
     email?: string;
     platformRole?: string;
     brokerDisplayName?: string;
-  } | null>(null);
+    permissions?: string[];
+  } | null)>(null);
 
   useEffect(() => {
     setIsSuperAdmin(localStorage.getItem("platformRole") === "SUPER_ADMIN");
     let cancelled = false;
     adminService
       .getMe()
-      .then((data: {
-        name?: string;
-        email?: string;
-        platformRole?: string;
-        brokerDisplayName?: string;
-        permissions?: string[];
-      } | null) => {
+      .then((data) => {
         if (cancelled || !data) return;
         setMe(data);
-        setCanViewPositions(canViewClientPositions(data));
-        setCanSlippage(canManageSlippage(data));
       })
       .catch(() => {});
     return () => {
@@ -258,10 +288,7 @@ export default function AdminSidebar() {
     };
   }, []);
 
-  const navSections = useMemo(
-    () => buildNavSections(isSuperAdmin, canViewPositions, canSlippage),
-    [isSuperAdmin, canViewPositions, canSlippage],
-  );
+  const navSections = useMemo(() => buildNavSections(me), [me]);
 
   const normalize = (p: string) => p.replace(/\/+$/, "");
   const currentPath = normalize(pathname);
@@ -505,7 +532,7 @@ export default function AdminSidebar() {
               initial={{ x: -280 }}
               animate={{ x: 0 }}
               exit={{ x: -280 }}
-              transition={{ type: "spring", stiffness: 420, damping: 35 }} // ðŸš€ FAST
+              transition={{ type: "spring", stiffness: 420, damping: 35 }} // 🚀 FAST
               className="fixed inset-y-0 left-0 z-[1200] w-[260px] bg-[var(--card-bg)]"
             >
               {renderSidebarInner()}
@@ -524,4 +551,3 @@ export default function AdminSidebar() {
     </>
   );
 }
-

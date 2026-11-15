@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowRightLeft, Bitcoin, RefreshCcw, Save, Wallet } from "lucide-react";
 import toast from "react-hot-toast";
 import GlobalLoader from "../components/ui/GlobalLoader";
@@ -22,23 +22,60 @@ export default function DollarRatePage() {
   const updateMutation = useUpdateConversionRates();
 
   const [usdtInrInput, setUsdtInrInput] = useState<string | null>(null);
+  const [usdtInrWithdrawInput, setUsdtInrWithdrawInput] = useState<string | null>(
+    null,
+  );
   const [btcUsdtInput, setBtcUsdtInput] = useState<string | null>(null);
+  const [btcUsdtWithdrawInput, setBtcUsdtWithdrawInput] = useState<string | null>(
+    null,
+  );
+  const [liveUsdInr, setLiveUsdInr] = useState<number | null>(null);
 
   const usdtInrValue = usdtInrInput ?? String(data?.data?.usdtInr ?? "");
+  const usdtInrWithdrawValue =
+    usdtInrWithdrawInput ?? String(data?.data?.usdtInrWithdraw ?? "");
   const btcUsdtValue = btcUsdtInput ?? String(data?.data?.btcUsdt ?? "");
+  const btcUsdtWithdrawValue =
+    btcUsdtWithdrawInput ?? String(data?.data?.btcUsdtWithdraw ?? "");
 
   const usdtInrNumber = Number(usdtInrValue);
+  const usdtInrWithdrawNumber = Number(usdtInrWithdrawValue);
   const btcUsdtNumber = Number(btcUsdtValue);
+  const btcUsdtWithdrawNumber = Number(btcUsdtWithdrawValue);
   const isValidForm =
     Number.isFinite(usdtInrNumber) &&
+    Number.isFinite(usdtInrWithdrawNumber) &&
     Number.isFinite(btcUsdtNumber) &&
+    Number.isFinite(btcUsdtWithdrawNumber) &&
     usdtInrNumber > 0 &&
-    btcUsdtNumber > 0;
+    usdtInrWithdrawNumber > 0 &&
+    btcUsdtNumber > 0 &&
+    btcUsdtWithdrawNumber > 0;
 
   const btcInr = useMemo(() => {
     if (!isValidForm) return null;
     return btcUsdtNumber * usdtInrNumber;
   }, [btcUsdtNumber, isValidForm, usdtInrNumber]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadLiveRate = async () => {
+      try {
+        const res = await fetch("https://open.er-api.com/v6/latest/USD");
+        const json = await res.json();
+        const inr = Number(json?.rates?.INR);
+        if (!cancelled && Number.isFinite(inr) && inr > 0) {
+          setLiveUsdInr(inr);
+        }
+      } catch {
+        /* live rate is optional */
+      }
+    };
+    loadLiveRate();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const formatNumber = (value?: number | null, fractionDigits = 2) => {
     if (value === undefined || value === null || Number.isNaN(value)) return "--";
@@ -87,18 +124,24 @@ export default function DollarRatePage() {
 
   const onSubmit = async () => {
     if (!isValidForm) {
-      toast.error("Please enter valid USDT/INR and BTC/USDT values.");
+      toast.error(
+        "Please enter valid deposit, withdraw and BTC/USDT values.",
+      );
       return;
     }
 
     try {
       const payload = {
         usdtInr: usdtInrNumber,
+        usdtInrWithdraw: usdtInrWithdrawNumber,
         btcUsdt: btcUsdtNumber,
+        btcUsdtWithdraw: btcUsdtWithdrawNumber,
       };
       await updateMutation.mutateAsync(payload);
       setUsdtInrInput(String(payload.usdtInr));
+      setUsdtInrWithdrawInput(String(payload.usdtInrWithdraw));
       setBtcUsdtInput(String(payload.btcUsdt));
+      setBtcUsdtWithdrawInput(String(payload.btcUsdtWithdraw));
       toast.success("Conversion rates updated successfully.");
     } catch (submitError) {
       toast.error(getErrorMessage(submitError, "Unable to update conversion rates."));
@@ -128,7 +171,7 @@ export default function DollarRatePage() {
               Conversion Rates
             </h1>
             <p className="max-w-2xl text-sm text-[var(--text-muted)]">
-              Manage admin conversion rates for USDT/INR and BTC/USDT with live sync.
+              Manage admin conversion rates for deposits, withdrawals, and BTC/USDT with live sync.
             </p>
           </div>
 
@@ -143,10 +186,22 @@ export default function DollarRatePage() {
           </button>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <StatsCard label="USDT in INR" value={formatNumber(data?.data?.usdtInr, 2)} />
-          <StatsCard label="BTC in USDT" value={formatNumber(data?.data?.btcUsdt, 2)} />
+        <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          <StatsCard label="Deposit USDT/INR" value={formatNumber(data?.data?.usdtInr, 2)} />
+          <StatsCard
+            label="Withdraw USDT/INR"
+            value={formatNumber(data?.data?.usdtInrWithdraw, 2)}
+          />
+          <StatsCard label="BTC in USDT (Dep)" value={formatNumber(data?.data?.btcUsdt, 2)} />
+          <StatsCard
+            label="BTC in USDT (Wdr)"
+            value={formatNumber(data?.data?.btcUsdtWithdraw, 2)}
+          />
           <StatsCard label="BTC in INR" value={formatNumber(btcInr, 2)} />
+          <StatsCard
+            label="Live USD/INR"
+            value={liveUsdInr ? formatNumber(liveUsdInr, 2) : "--"}
+          />
           <StatsCard
             label="Last Updated"
             value={formatDateTime(data?.data?.updatedAt || dataUpdatedAt)}
@@ -169,18 +224,32 @@ export default function DollarRatePage() {
 
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <InputCard
-              label="USDT / INR"
+              label="USDT / INR (Deposit)"
               value={usdtInrValue}
               onChange={setUsdtInrInput}
               icon={<Wallet size={16} />}
               placeholder="91"
             />
             <InputCard
-              label="BTC / USDT"
+              label="USDT / INR (Withdraw)"
+              value={usdtInrWithdrawValue}
+              onChange={setUsdtInrWithdrawInput}
+              icon={<Wallet size={16} />}
+              placeholder="89"
+            />
+            <InputCard
+              label="BTC / USDT (Deposit)"
               value={btcUsdtValue}
               onChange={setBtcUsdtInput}
               icon={<Bitcoin size={16} />}
               placeholder="65000"
+            />
+            <InputCard
+              label="BTC / USDT (Withdraw)"
+              value={btcUsdtWithdrawValue}
+              onChange={setBtcUsdtWithdrawInput}
+              icon={<Bitcoin size={16} />}
+              placeholder="64800"
             />
           </div>
 
@@ -209,12 +278,20 @@ export default function DollarRatePage() {
 
           <div className="mt-4 space-y-3 text-sm">
             <PreviewRow
-              left="1 BTC"
+              left="1 BTC (deposit)"
               right={`${formatNumber(btcUsdtNumber, 2)} USDT`}
             />
             <PreviewRow
-              left="1 USDT"
+              left="1 BTC (withdraw)"
+              right={`${formatNumber(btcUsdtWithdrawNumber, 2)} USDT`}
+            />
+            <PreviewRow
+              left="1 USDT (deposit)"
               right={`${formatNumber(usdtInrNumber, 2)} INR`}
+            />
+            <PreviewRow
+              left="1 USDT (withdraw)"
+              right={`${formatNumber(usdtInrWithdrawNumber, 2)} INR`}
             />
             <PreviewRow
               left="1 BTC"
