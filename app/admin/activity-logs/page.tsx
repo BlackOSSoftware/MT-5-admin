@@ -575,16 +575,16 @@ export default function ActivityLogsPage() {
                     <td>
                       <div className="flex flex-col">
                         <span className="font-semibold">
-                          {log.actor_name || formatLabel(log.actor_type)}
+                          {log.actor_name || log.actor_email || formatLabel(log.actor_type)}
                         </span>
-                        {log.actor_role && (
+                        {(log.actor_role || log.actor_email) && (
                           <span className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                            {formatLabel(log.actor_role)}
-                          </span>
-                        )}
-                        {log.actor_email && (
-                          <span className="text-xs text-[var(--text-muted)]">
-                            {log.actor_email}
+                            {[
+                              log.actor_role ? formatLabel(log.actor_role) : null,
+                              log.actor_email || null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
                           </span>
                         )}
                       </div>
