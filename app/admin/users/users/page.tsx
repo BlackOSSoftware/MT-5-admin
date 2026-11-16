@@ -19,7 +19,7 @@ import Pagination from "../../components/ui/pagination";
 import GlobalLoader from "../../components/ui/GlobalLoader";
 import DragScroll from "../../components/ui/DragScroll";
 import { useAdminUsers } from "@/hooks/useAdminUsers";
-import { setAdminUserIbDashboard } from "@/services/user.service";
+import { setAdminUserAppLock, setAdminUserIbDashboard } from "@/services/user.service";
 import type { AdminUser } from "@/types/user";
 import PresenceBadge from "@/app/admin/components/ui/PresenceBadge";
 
@@ -122,7 +122,7 @@ export default function UsersPage() {
   const users = listQuery.data?.data ?? EMPTY_USERS;
   const pagination = listQuery.data?.pagination;
   const ibToggleAllowed = Boolean(listQuery.data?.ibToggleAllowed);
-  const colCount = (ibToggleAllowed ? 10 : 9) + (isSuperAdmin ? 1 : 0);
+  const colCount = (ibToggleAllowed ? 11 : 10) + (isSuperAdmin ? 1 : 0);
   const totalPages = pagination?.totalPages ?? 1;
   const total = pagination?.total ?? users.length;
   const isInitialLoading = listQuery.isLoading && !listQuery.data;
@@ -373,7 +373,7 @@ export default function UsersPage() {
         </div>
 
         <DragScroll className="overflow-x-auto">
-          <table className={`w-full text-left text-sm ${ibToggleAllowed ? "min-w-[1100px]" : "min-w-[980px]"} ${isSuperAdmin ? "min-w-[1200px]" : ""}`}>
+          <table className={`w-full text-left text-sm ${ibToggleAllowed ? "min-w-[1220px]" : "min-w-[1080px]"} ${isSuperAdmin ? "min-w-[1320px]" : ""}`}>
             <thead className="bg-[var(--input-bg)] text-[var(--text-muted)] text-xs uppercase">
               <tr>
                 <th className="px-4 py-3">#</th>
@@ -386,6 +386,7 @@ export default function UsersPage() {
                 {isSuperAdmin && <th className="px-4 py-3">Admin / Broker</th>}
                 <th className="px-4 py-3">Mail</th>
                 <th className="px-4 py-3">KYC</th>
+                <th className="px-4 py-3">App Lock</th>
                 {ibToggleAllowed && <th className="px-4 py-3">IB Dashboard</th>}
                 <th className="px-4 py-3">Created</th>
               </tr>
@@ -486,6 +487,9 @@ export default function UsersPage() {
                         {u.kycStatus || "UNKNOWN"}
                       </span>
                     </td>
+                    <td className="px-4 py-3">
+                      <AppLockToggle userId={u._id} enabled={Boolean(u.appLocked)} />
+                    </td>
                     {ibToggleAllowed && (
                       <td className="px-4 py-3">
                         <IbDashboardToggle userId={u._id} enabled={Boolean(u.ibDashboardEnabled)} />
@@ -511,6 +515,58 @@ export default function UsersPage() {
           setPage(1);
         }}
       />
+    </div>
+  );
+}
+
+function AppLockToggle({ userId, enabled }: { userId: string; enabled: boolean }) {
+  const queryClient = useQueryClient();
+  const [pending, setPending] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const shown = pending ?? enabled;
+
+  const toggle = async () => {
+    if (pending !== null) return;
+    const next = !enabled;
+    setPending(next);
+    setError(null);
+    try {
+      await setAdminUserAppLock(userId, next);
+      await queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } }; message?: string };
+      setError(e?.response?.data?.message || e?.message || "Update failed");
+    } finally {
+      setPending(null);
+    }
+  };
+
+  return (
+    <div
+      className="flex items-center gap-2"
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        role="switch"
+        aria-checked={shown}
+        aria-label={shown ? "Unlock app access" : "Lock app access"}
+        disabled={pending !== null}
+        onClick={toggle}
+        className={`relative h-5 w-9 shrink-0 rounded-full transition disabled:opacity-60 ${
+          shown ? "bg-rose-500" : "bg-slate-300"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${
+            shown ? "left-[18px]" : "left-0.5"
+          }`}
+        />
+      </button>
+      <span className={`text-[11px] font-medium ${shown ? "text-rose-600" : "text-[var(--text-muted)]"}`}>
+        {error ? <span className="text-[var(--danger)]">{error}</span> : shown ? "Locked" : "Open"}
+      </span>
     </div>
   );
 }

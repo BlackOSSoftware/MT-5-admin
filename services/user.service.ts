@@ -94,6 +94,17 @@ export async function setAdminUserIbDashboard(
   return unwrapApi(data);
 }
 
+export async function setAdminUserAppLock(
+  userId: string,
+  enabled: boolean
+): Promise<{ _id: string; appLocked: boolean }> {
+  const { data } = await api.patch<ApiEnvelope<{ _id: string; appLocked: boolean }>>(
+    `/user/admin/${userId}/app-lock`,
+    { enabled }
+  );
+  return unwrapApi(data);
+}
+
 export async function fetchAdminUserTransactions(
   userId: string,
   params: {

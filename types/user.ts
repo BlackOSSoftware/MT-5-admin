@@ -11,6 +11,7 @@ export type AdminUser = {
   lastSeenAt?: string | null;
   device?: string | null;
   ibDashboardEnabled?: boolean;
+  appLocked?: boolean;
   broker?: { _id: string; displayName: string; code: string } | null;
 };
 
@@ -51,6 +52,7 @@ export type AdminUserProfile = {
   isOnline?: boolean;
   lastSeenAt?: string | null;
   ibDashboardEnabled?: boolean;
+  appLocked?: boolean;
   /** Sum of live trading account balances — same as portal "wallet balance". */
   trading_balance?: number;
   date_of_birth?: string;
