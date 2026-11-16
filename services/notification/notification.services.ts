@@ -42,6 +42,9 @@ export interface NotificationListResponse {
   };
 }
 
+/** FCM delivery target — web portal, mobile app, or both. */
+export type NotificationPushChannel = "WEB" | "APP" | "BOTH";
+
 export type BroadcastNotificationPayload = {
   title: string;
   message: string;
@@ -50,6 +53,10 @@ export type BroadcastNotificationPayload = {
     type: NotificationType;
   };
   audience?: NotificationAudience;
+  /** Default false — email only when admin opts in. */
+  sendEmail?: boolean;
+  /** Default BOTH. */
+  pushChannel?: NotificationPushChannel;
 };
 
 export type SendUserNotificationPayload = BroadcastNotificationPayload & {

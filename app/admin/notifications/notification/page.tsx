@@ -12,6 +12,7 @@ import Pagination from "../../components/ui/pagination";
 import {
   Notification,
   NotificationAudience,
+  NotificationPushChannel,
   NotificationType,
   searchUsersForNotifyService,
 } from "@/services/notification/notification.services";
@@ -225,6 +226,9 @@ function SendNotificationModal({ onClose }: { onClose: () => void }) {
     message: "",
     type: "GENERAL" as NotificationType,
   });
+  const [pushChannel, setPushChannel] =
+    useState<NotificationPushChannel>("BOTH");
+  const [sendEmail, setSendEmail] = useState(false);
   const [userQuery, setUserQuery] = useState("");
   const [userResults, setUserResults] = useState<
     Array<{ _id: string; email: string; name?: string }>
@@ -280,6 +284,8 @@ function SendNotificationModal({ onClose }: { onClose: () => void }) {
       message: formData.message.trim(),
       expireAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       data: { type: formData.type },
+      pushChannel,
+      sendEmail,
       ...(isSuperAdmin ? { audience } : {}),
     };
 
@@ -296,6 +302,8 @@ function SendNotificationModal({ onClose }: { onClose: () => void }) {
       await queryClient.invalidateQueries({ queryKey: ["admin-notifications"] });
       onClose();
       setFormData({ title: "", message: "", type: "GENERAL" });
+      setPushChannel("BOTH");
+      setSendEmail(false);
     } catch (error) {
       console.error("Send failed:", error);
     } finally {
@@ -472,6 +480,53 @@ function SendNotificationModal({ onClose }: { onClose: () => void }) {
               <option value="HOLIDAY">Holiday</option>
             </select>
           </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
+              Push to
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  { key: "APP", label: "App only" },
+                  { key: "WEB", label: "Web only" },
+                  { key: "BOTH", label: "App + Web" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setPushChannel(opt.key)}
+                  disabled={isSending}
+                  className={`rounded-xl border px-2 py-2.5 text-xs font-semibold ${
+                    pushChannel === opt.key
+                      ? "border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--foreground)]"
+                      : "border-[var(--card-border)] text-[var(--text-muted)]"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <label className="flex items-start gap-3 rounded-xl border border-[var(--card-border)] px-3 py-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={sendEmail}
+              onChange={(e) => setSendEmail(e.target.checked)}
+              disabled={isSending}
+              className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-[var(--foreground)]">
+                Also send email
+              </span>
+              <span className="block text-xs text-[var(--text-muted)] mt-0.5">
+                Off by default — tick only if you want an email copy too
+              </span>
+            </span>
+          </label>
 
           <div className="flex gap-3 pt-2">
             <button
