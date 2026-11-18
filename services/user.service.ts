@@ -105,6 +105,28 @@ export async function setAdminUserAppLock(
   return unwrapApi(data);
 }
 
+export async function setAdminUserAccountLimit(
+  userId: string,
+  limit: number
+): Promise<{
+  _id: string;
+  email?: string;
+  accountLimit: number;
+  currentCount: number;
+  effectiveLimit: number | null;
+}> {
+  const { data } = await api.patch<
+    ApiEnvelope<{
+      _id: string;
+      email?: string;
+      accountLimit: number;
+      currentCount: number;
+      effectiveLimit: number | null;
+    }>
+  >(`/user/admin/${userId}/account-limit`, { limit });
+  return unwrapApi(data);
+}
+
 export async function fetchAdminUserTransactions(
   userId: string,
   params: {

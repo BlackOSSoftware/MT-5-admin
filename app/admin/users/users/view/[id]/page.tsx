@@ -46,9 +46,11 @@ import GlobalLoader from "@/app/admin/components/ui/GlobalLoader";
 import { Toast } from "@/app/admin/components/ui/Toast";
 import Pagination from "@/app/admin/components/ui/pagination";
 import DragScroll from "@/app/admin/components/ui/DragScroll";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAdminUser } from "@/hooks/useAdminUser";
 import { useAdminUserAccounts } from "@/hooks/useAdminUserAccounts";
 import { useAdminUserTransactions } from "@/hooks/useAdminUserTransactions";
+import { setAdminUserAccountLimit } from "@/services/user.service";
 import { useTradeAdminClosedTrades } from "@/hooks/useTradeAdminClosedTrades";
 import { useTradeAdminPendingOpenOrders } from "@/hooks/useTradeAdminPendingOpenOrders";
 import { useLiveQuotesBySymbols } from "@/hooks/useLiveQuotesBySymbols";
@@ -387,6 +389,7 @@ export default function UserViewPage() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const rawId = params?.id as string | string[] | undefined;
   const userId = Array.isArray(rawId) ? rawId[0] : rawId;
 
@@ -426,6 +429,9 @@ export default function UserViewPage() {
     bonus_percent_override: "",
   });
   const [toast, setToast] = useState("");
+  const [accountLimitInput, setAccountLimitInput] = useState("");
+  const [accountLimitSaving, setAccountLimitSaving] = useState(false);
+  const [accountLimitError, setAccountLimitError] = useState("");
   const [touched, setTouched] = useState<Partial<Record<keyof AdminUserUpdatePayload, boolean>>>({});
   const [activeTab, setActiveTab] = useState<
     | "Fund History"
@@ -1212,6 +1218,79 @@ export default function UserViewPage() {
     const t = setTimeout(() => setToast(""), 3000);
     return () => clearTimeout(t);
   }, [toast]);
+
+  const currentAccountCount = useMemo(() => {
+    if (typeof userQuery.data?.accountsCount === "number") {
+      return userQuery.data.accountsCount;
+    }
+    return accountList.filter(
+      (account) => String(account.status ?? "active").toLowerCase() !== "disabled"
+    ).length;
+  }, [userQuery.data?.accountsCount, accountList]);
+
+  const disabledAccountCount = useMemo(() => {
+    if (typeof userQuery.data?.disabledAccountsCount === "number") {
+      return userQuery.data.disabledAccountsCount;
+    }
+    return accountList.filter(
+      (account) => String(account.status ?? "").toLowerCase() === "disabled"
+    ).length;
+  }, [userQuery.data?.disabledAccountsCount, accountList]);
+
+  useEffect(() => {
+    if (!userQuery.data) return;
+    const effective =
+      userQuery.data.accountLimit ??
+      userQuery.data.effectiveAccountLimit ??
+      null;
+    setAccountLimitInput(
+      effective != null
+        ? String(effective)
+        : String(Math.max(1, currentAccountCount || 1))
+    );
+    setAccountLimitError("");
+  }, [
+    userQuery.data?.accountLimit,
+    userQuery.data?.effectiveAccountLimit,
+    currentAccountCount,
+    userId,
+  ]);
+
+  const saveAccountLimit = async () => {
+    if (!userId || accountLimitSaving) return;
+    const parsed = Number(accountLimitInput);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      setAccountLimitError("Enter a whole number of at least 1.");
+      return;
+    }
+    if (parsed < currentAccountCount) {
+      setAccountLimitError(
+        `User already has ${currentAccountCount} active account${
+          currentAccountCount === 1 ? "" : "s"
+        }. Limit cannot be set below ${currentAccountCount}. Disable an account first to free a slot.`
+      );
+      return;
+    }
+
+    setAccountLimitSaving(true);
+    setAccountLimitError("");
+    try {
+      const result = await setAdminUserAccountLimit(userId, parsed);
+      await queryClient.invalidateQueries({ queryKey: ["admin-user", userId] });
+      setAccountLimitInput(String(result.accountLimit));
+      setToast(`Account limit updated to ${result.accountLimit}.`);
+    } catch (err: unknown) {
+      const e = err as {
+        response?: { data?: { message?: string } };
+        message?: string;
+      };
+      setAccountLimitError(
+        e?.response?.data?.message || e?.message || "Failed to update account limit."
+      );
+    } finally {
+      setAccountLimitSaving(false);
+    }
+  };
 
   const displayName = profileSnapshot.name || "User";
   const displayEmail = profileSnapshot.email || "--";
@@ -2544,6 +2623,71 @@ export default function UserViewPage() {
 
 	      {activeTab === "Accounts" && (
 	        <div className="w-full max-w-full overflow-x-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5">
+            <div className="mb-5 rounded-xl border border-[var(--card-border)] bg-[var(--input-bg)] p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold text-[var(--text-main)]">
+                    Account Limit
+                  </h3>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    Max active trading accounts this user can have. Disabled
+                    accounts do not count and free a slot for a new account.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                    <span className="inline-flex items-center rounded-full border border-[var(--card-border)] bg-[var(--card-bg)] px-2.5 py-1 font-semibold text-[var(--text-main)]">
+                      Active accounts: {currentAccountCount}
+                    </span>
+                    {disabledAccountCount > 0 ? (
+                      <span className="inline-flex items-center rounded-full border border-slate-400/40 bg-slate-500/10 px-2.5 py-1 font-semibold text-slate-700">
+                        Disabled: {disabledAccountCount} (not counted)
+                      </span>
+                    ) : null}
+                    <span className="inline-flex items-center rounded-full border border-[var(--card-border)] bg-[var(--card-bg)] px-2.5 py-1 font-semibold text-[var(--text-main)]">
+                      Effective limit:{" "}
+                      {userQuery.data?.effectiveAccountLimit ??
+                        userQuery.data?.accountLimit ??
+                        "No limit"}
+                    </span>
+                    {userQuery.data?.accountLimit == null ? (
+                      <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 font-semibold text-amber-700">
+                        Using broker default
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <label className="sr-only" htmlFor="account-limit-input">
+                    Account limit
+                  </label>
+                  <input
+                    id="account-limit-input"
+                    type="number"
+                    min={Math.max(1, currentAccountCount)}
+                    step={1}
+                    value={accountLimitInput}
+                    onChange={(e) => {
+                      setAccountLimitInput(e.target.value);
+                      setAccountLimitError("");
+                    }}
+                    className="h-9 w-28 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] px-3 text-sm text-[var(--text-main)] outline-none focus:border-[var(--accent)]"
+                  />
+                  <button
+                    type="button"
+                    onClick={saveAccountLimit}
+                    disabled={accountLimitSaving || !userId}
+                    className="inline-flex h-9 items-center justify-center rounded-lg bg-[var(--accent)] px-4 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {accountLimitSaving ? "Saving..." : "Save limit"}
+                  </button>
+                </div>
+              </div>
+              {accountLimitError ? (
+                <p className="mt-2 text-xs font-medium text-rose-600">
+                  {accountLimitError}
+                </p>
+              ) : null}
+            </div>
+
 	          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 	            <div>
 	              <h3 className="text-lg font-semibold">Accounts Overview</h3>

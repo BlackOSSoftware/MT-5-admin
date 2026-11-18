@@ -53,6 +53,15 @@ export type AdminUserProfile = {
   lastSeenAt?: string | null;
   ibDashboardEnabled?: boolean;
   appLocked?: boolean;
+  /** Per-user max trading accounts (null = broker default). */
+  accountLimit?: number | null;
+  /** Active accounts only (disabled do not count toward limit). */
+  accountsCount?: number;
+  totalAccountsCount?: number;
+  disabledAccountsCount?: number;
+  /** Effective cap after override / broker default (null = no cap). */
+  effectiveAccountLimit?: number | null;
+  brokerCode?: string | null;
   /** Sum of live trading account balances — same as portal "wallet balance". */
   trading_balance?: number;
   date_of_birth?: string;

@@ -41,6 +41,7 @@ export default function CreateTraderFund() {
     useState<FundTransactionType>(defaultTransactionType);
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [amount, setAmount] = useState("");
+  const [remark, setRemark] = useState("");
   const [withdrawMethod, setWithdrawMethod] = useState<WithdrawalMethod>("BANK");
   const [withdrawPayout, setWithdrawPayout] = useState<WithdrawalPayoutPayload>({
     bank_name: "",
@@ -149,6 +150,8 @@ export default function CreateTraderFund() {
 
             let payout: WithdrawalPayoutPayload;
 
+            const remarkNote = remark.trim() || note;
+
             if (withdrawMethod === "BANK") {
               if (!bankName || !accountHolderName || !accountNumber) {
                 throw new Error("Bank payout details are required.");
@@ -158,6 +161,7 @@ export default function CreateTraderFund() {
                 account_holder_name: accountHolderName,
                 account_number: accountNumber,
                 ifsc,
+                ...(remarkNote ? { note: remarkNote } : {}),
               };
             } else if (withdrawMethod === "UPI") {
               if (!upiId || !accountHolderName) {
@@ -166,6 +170,7 @@ export default function CreateTraderFund() {
               payout = {
                 upi_id: upiId,
                 account_holder_name: accountHolderName,
+                ...(remarkNote ? { note: remarkNote } : {}),
               };
             } else if (withdrawMethod === "CRYPTO") {
               if (!cryptoAddress) {
@@ -174,6 +179,7 @@ export default function CreateTraderFund() {
               payout = {
                 crypto_address: cryptoAddress,
                 wallet_network: walletNetwork,
+                ...(remarkNote ? { note: remarkNote } : {}),
               };
             } else {
               if (!accountHolderName || !accountNumber) {
@@ -182,7 +188,7 @@ export default function CreateTraderFund() {
               payout = {
                 account_holder_name: accountHolderName,
                 account_number: accountNumber,
-                note,
+                note: remarkNote,
               };
             }
 
@@ -197,6 +203,7 @@ export default function CreateTraderFund() {
             accountId: selectedAccountId,
             amount: parsedAmount,
             method: "MANUAL",
+            ...(remark.trim() ? { remark: remark.trim() } : {}),
           });
 
       if (!response?.success) {
@@ -205,6 +212,7 @@ export default function CreateTraderFund() {
       }
 
       setAmount("");
+      setRemark("");
       setSubmitError("");
       setSubmitType(transactionType);
       setSubmitSuccess(response);
@@ -400,6 +408,26 @@ export default function CreateTraderFund() {
                 bg-[var(--input-bg)] border border-[var(--input-border)]
               "
               placeholder="Enter amount"
+            />
+          </div>
+
+          {/* Remark */}
+          <div className="md:col-span-2">
+            <label className="inline-flex items-center gap-1.5 text-sm mb-1">
+              <FileText size={14} />
+              Remark
+              <span className="text-[var(--text-muted)] font-normal">(optional)</span>
+            </label>
+            <textarea
+              value={remark}
+              onChange={(e) => setRemark(e.target.value)}
+              maxLength={500}
+              rows={3}
+              className="
+                w-full px-4 py-2 rounded-lg resize-y
+                bg-[var(--input-bg)] border border-[var(--input-border)]
+              "
+              placeholder="Add a remark for this transaction"
             />
           </div>
 

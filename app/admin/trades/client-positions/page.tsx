@@ -111,14 +111,20 @@ export default function ClientPositionsPage() {
   const [period, setPeriod] = useState<Period>("today");
   const [accountType, setAccountType] = useState<ClientPositionAccountType>("live");
   const [symbol, setSymbol] = useState<string | null>(null);
+  const [symbolQuery, setSymbolQuery] = useState("");
+  const [symbolMenuOpen, setSymbolMenuOpen] = useState(false);
   const [side, setSide] = useState<SideFilter>("ALL");
   const [slFilter, setSlFilter] = useState<SlFilter>("ALL");
   const [sort, setSort] = useState<SortKey>("lots_desc");
   const [search, setSearch] = useState("");
   const [pending, setPending] = useState<PendingAction>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkCloseOpen, setBulkCloseOpen] = useState(false);
+  const [bulkCloseProgress, setBulkCloseProgress] = useState<{ done: number; total: number } | null>(null);
   const [editing, setEditing] = useState<ClientPositionRow | null>(null);
   const [closedView, setClosedView] = useState<ClosedView | null>(null);
   const positionsRef = useRef<HTMLElement | null>(null);
+  const symbolFilterRef = useRef<HTMLDivElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -152,6 +158,37 @@ export default function ClientPositionsPage() {
     refetchIntervalInBackground: false,
   });
   const data = report.data;
+
+  const symbolOptions = useMemo(() => {
+    const fromScripts = (data?.scripts ?? []).map((s) => s.symbol);
+    const fromPositions = (data?.positions ?? []).map((p) => p.symbol);
+    return Array.from(new Set([...fromScripts, ...fromPositions]))
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+  }, [data]);
+
+  const filteredSymbolOptions = useMemo(() => {
+    const q = symbolQuery.trim().toLowerCase();
+    if (!q) return symbolOptions;
+    return symbolOptions.filter((sym) => sym.toLowerCase().includes(q));
+  }, [symbolOptions, symbolQuery]);
+
+  useEffect(() => {
+    if (!symbolMenuOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!symbolFilterRef.current?.contains(event.target as Node)) {
+        setSymbolMenuOpen(false);
+        setSymbolQuery(symbol ?? "");
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [symbolMenuOpen, symbol]);
+
+  useEffect(() => {
+    if (symbolMenuOpen) return;
+    setSymbolQuery(symbol ?? "");
+  }, [symbol, symbolMenuOpen]);
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -222,6 +259,88 @@ export default function ClientPositionsPage() {
       setNotice({ type: "error", text: e?.response?.data?.message || e?.message || "Action failed" });
     } finally {
       setBusy(false);
+    }
+  };
+
+  const bulkCloseTargets = useMemo(
+    () => rows.filter((row) => selectedIds.has(row.positionId)),
+    [rows, selectedIds],
+  );
+  const allVisibleSelected =
+    rows.length > 0 && rows.every((row) => selectedIds.has(row.positionId));
+  const someVisibleSelected = rows.some((row) => selectedIds.has(row.positionId));
+  const canBulkClose = bulkCloseTargets.length > 0;
+
+  useEffect(() => {
+    const visible = new Set(rows.map((row) => row.positionId));
+    setSelectedIds((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (visible.has(id)) next.add(id);
+        else changed = true;
+      });
+      return changed ? next : prev;
+    });
+  }, [rows]);
+
+  const toggleRowSelected = (positionId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(positionId)) next.delete(positionId);
+      else next.add(positionId);
+      return next;
+    });
+  };
+
+  const toggleSelectAllVisible = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        rows.forEach((row) => next.delete(row.positionId));
+      } else {
+        rows.forEach((row) => next.add(row.positionId));
+      }
+      return next;
+    });
+  };
+
+  const runBulkClose = async () => {
+    if (!canBulkClose || busy) return;
+    const targets = [...bulkCloseTargets];
+    setBusy(true);
+    setBulkCloseProgress({ done: 0, total: targets.length });
+    let closed = 0;
+    let failed = 0;
+    for (let i = 0; i < targets.length; i += 1) {
+      const row = targets[i];
+      try {
+        await closeTradeAdminPosition({
+          accountId: row.accountId,
+          positionId: row.positionId,
+          userId: row.userId,
+        });
+        closed += 1;
+      } catch {
+        failed += 1;
+      }
+      setBulkCloseProgress({ done: i + 1, total: targets.length });
+    }
+    setBulkCloseOpen(false);
+    setBulkCloseProgress(null);
+    setSelectedIds(new Set());
+    setBusy(false);
+    await queryClient.invalidateQueries({ queryKey: ["client-position-report"] });
+    if (failed === 0) {
+      setNotice({
+        type: "success",
+        text: `Closed ${closed} selected position${closed === 1 ? "" : "s"} at market.`,
+      });
+    } else {
+      setNotice({
+        type: "error",
+        text: `Closed ${closed} of ${targets.length} selected positions. ${failed} failed.`,
+      });
     }
   };
 
@@ -546,6 +665,8 @@ export default function ClientPositionsPage() {
                   type="button"
                   onClick={() => {
                     setSymbol(null);
+                    setSymbolQuery("");
+                    setSymbolMenuOpen(false);
                     setSide("ALL");
                     setSlFilter("ALL");
                     setSearch("");
@@ -566,6 +687,79 @@ export default function ClientPositionsPage() {
                 placeholder="Client, account or ticket"
                 className="h-9 w-52 rounded-lg border border-[var(--input-border)] bg-[var(--input-bg)] pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
               />
+            </div>
+            <div ref={symbolFilterRef} className="relative">
+              <Search
+                size={14}
+                className="pointer-events-none absolute left-2.5 top-1/2 z-[1] -translate-y-1/2 text-[var(--text-muted)]"
+              />
+              <input
+                value={symbolMenuOpen ? symbolQuery : symbol ?? ""}
+                onChange={(e) => {
+                  setSymbolQuery(e.target.value);
+                  setSymbolMenuOpen(true);
+                }}
+                onFocus={() => {
+                  setSymbolMenuOpen(true);
+                  setSymbolQuery(symbol ?? "");
+                }}
+                placeholder="All symbols"
+                className="h-9 w-40 rounded-lg border border-[var(--input-border)] bg-[var(--input-bg)] pl-8 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
+                aria-label="Search and filter by symbol"
+                aria-expanded={symbolMenuOpen}
+                aria-autocomplete="list"
+              />
+              {symbol ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSymbol(null);
+                    setSymbolQuery("");
+                    setSymbolMenuOpen(false);
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[var(--text-muted)] hover:bg-[var(--hover-bg)] hover:text-[var(--foreground)]"
+                  aria-label="Clear symbol filter"
+                >
+                  <X size={12} />
+                </button>
+              ) : null}
+              {symbolMenuOpen ? (
+                <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-30 max-h-56 overflow-y-auto rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSymbol(null);
+                      setSymbolQuery("");
+                      setSymbolMenuOpen(false);
+                    }}
+                    className={`block w-full px-3 py-2 text-left text-sm hover:bg-[var(--hover-bg)] ${
+                      !symbol ? "bg-[var(--hover-bg)] font-semibold" : "text-[var(--text-muted)]"
+                    }`}
+                  >
+                    All symbols
+                  </button>
+                  {filteredSymbolOptions.length === 0 ? (
+                    <p className="px-3 py-2 text-xs text-[var(--text-muted)]">No symbols found</p>
+                  ) : (
+                    filteredSymbolOptions.map((sym) => (
+                      <button
+                        key={sym}
+                        type="button"
+                        onClick={() => {
+                          setSymbol(sym);
+                          setSymbolQuery(sym);
+                          setSymbolMenuOpen(false);
+                        }}
+                        className={`block w-full px-3 py-2 text-left text-sm hover:bg-[var(--hover-bg)] ${
+                          symbol === sym ? "bg-[var(--hover-bg)] font-semibold" : ""
+                        }`}
+                      >
+                        {sym}
+                      </button>
+                    ))
+                  )}
+                </div>
+              ) : null}
             </div>
             <Segmented
               value={side}
@@ -597,6 +791,20 @@ export default function ClientPositionsPage() {
                 </option>
               ))}
             </select>
+            <button
+              type="button"
+              disabled={!canBulkClose || busy}
+              onClick={() => setBulkCloseOpen(true)}
+              title={
+                canBulkClose
+                  ? `Close ${bulkCloseTargets.length} selected position(s) at market`
+                  : "Select positions with the checkbox in front of Symbol"
+              }
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <XCircle size={14} />
+              Close selected{canBulkClose ? ` (${bulkCloseTargets.length})` : ""}
+            </button>
           </div>
         </div>
 
@@ -604,11 +812,25 @@ export default function ClientPositionsPage() {
           <table className="w-full min-w-[1280px] text-sm">
             <thead className="bg-[var(--input-bg)] text-[11px] uppercase text-[var(--text-muted)]">
               <tr>
-                {["Client", "Symbol", "Side", "Lots", "Open price", "Live Bid / Ask", "Stop loss", "Take profit", "P/L", "Risk", "Opened", ""].map(
+                <th className="px-4 py-3 text-left">Client</th>
+                <th className="px-3 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = someVisibleSelected && !allVisibleSelected;
+                    }}
+                    onChange={toggleSelectAllVisible}
+                    disabled={rows.length === 0 || busy}
+                    aria-label="Select all visible positions"
+                    className="h-4 w-4 accent-[var(--primary)]"
+                  />
+                </th>
+                {["Symbol", "Side", "Lots", "Open price", "Live Bid / Ask", "Stop loss", "Take profit", "P/L", "Risk", "Opened", ""].map(
                   (h, i) => (
                     <th
                       key={`${h}-${i}`}
-                      className={`px-4 py-3 ${i >= 3 && i <= 9 ? "text-right" : "text-left"}`}
+                      className={`px-4 py-3 ${i >= 2 && i <= 8 ? "text-right" : "text-left"}`}
                     >
                       {h}
                     </th>
@@ -619,7 +841,7 @@ export default function ClientPositionsPage() {
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="py-10 text-center text-sm text-[var(--text-muted)]">
+                  <td colSpan={13} className="py-10 text-center text-sm text-[var(--text-muted)]">
                     {report.isLoading ? "Loading…" : "No positions match these filters."}
                   </td>
                 </tr>
@@ -632,6 +854,16 @@ export default function ClientPositionsPage() {
                         #{p.accountNumber || "--"} · {p.accountType || "live"}
                         {p.ticket ? ` · T${p.ticket}` : ""}
                       </p>
+                    </td>
+                    <td className="px-3 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(p.positionId)}
+                        onChange={() => toggleRowSelected(p.positionId)}
+                        disabled={busy}
+                        aria-label={`Select ${p.symbol} position`}
+                        className="h-4 w-4 accent-[var(--primary)]"
+                      />
                     </td>
                     <td className="px-4 py-3 font-semibold">{p.symbol}</td>
                     <td className="px-4 py-3">
@@ -726,6 +958,69 @@ export default function ClientPositionsPage() {
           onCancel={() => !busy && setPending(null)}
           onConfirm={runAction}
         />
+      ) : null}
+
+      {bulkCloseOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Cancel"
+            onClick={() => !busy && setBulkCloseOpen(false)}
+            className="absolute inset-0 bg-black/40"
+          />
+          <div className="relative w-full max-w-sm rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-5 shadow-2xl">
+            <h3 className="text-base font-semibold">Close selected positions?</h3>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Checked positions will be closed at the current market price.
+            </p>
+            <dl className="mt-4 space-y-1.5 rounded-xl bg-[var(--input-bg)] p-3 text-sm">
+              {[
+                ["Selected", String(bulkCloseTargets.length)],
+                [
+                  "Symbols",
+                  Array.from(new Set(bulkCloseTargets.map((row) => row.symbol))).join(", ") || "--",
+                ],
+                [
+                  "Total lots",
+                  lots(bulkCloseTargets.reduce((sum, row) => sum + Number(row.volume || 0), 0)),
+                ],
+                [
+                  "Combined P/L",
+                  money(bulkCloseTargets.reduce((sum, row) => sum + Number(row.floatingPnL || 0), 0)),
+                ],
+              ].map(([k, v]) => (
+                <div key={k} className="flex justify-between gap-3">
+                  <dt className="text-[var(--text-muted)]">{k}</dt>
+                  <dd className="max-w-[60%] break-words text-right font-semibold">{v}</dd>
+                </div>
+              ))}
+            </dl>
+            {bulkCloseProgress ? (
+              <p className="mt-3 text-xs text-[var(--text-muted)]">
+                Closing… {bulkCloseProgress.done}/{bulkCloseProgress.total}
+              </p>
+            ) : null}
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setBulkCloseOpen(false)}
+                disabled={busy}
+                className="flex-1 rounded-lg border border-[var(--card-border)] py-2 text-sm font-semibold hover:bg-[var(--hover-bg)] disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void runBulkClose()}
+                disabled={busy || bulkCloseTargets.length === 0}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-rose-600 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
+              >
+                {busy ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
+                Close selected
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {notice ? (

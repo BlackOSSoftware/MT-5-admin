@@ -52,6 +52,8 @@ interface NavItem {
   label: string;
   icon: JSX.Element;
   children?: NavItem[];
+  /** Small pill next to the label (e.g. "Add"). */
+  mark?: string;
   /** Broker-admin needs ANY of these (SuperAdmin always sees it). */
   anyOf?: string[];
 }
@@ -101,6 +103,12 @@ function buildNavSections(me: AdminMeLike): {
           children: [
             { href: "/admin/users/users", label: "All Users", icon: <Users size={14} /> },
             { href: "/admin/users/users-funds", label: "User Funds", icon: <Wallet size={14} /> },
+            {
+              href: "/admin/users/users-funds/create",
+              label: "Add User Fund",
+              icon: <Plus size={14} />,
+              mark: "Add",
+            },
           ],
         },
         {
@@ -452,6 +460,11 @@ export default function AdminSidebar() {
                               >
                                 {child.label}
                               </span>
+                              {child.mark ? (
+                                <span className="ml-auto inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                                  {child.mark}
+                                </span>
+                              ) : null}
                             </Link>
                           ))}
                         </motion.div>
