@@ -92,6 +92,28 @@ function buildNavSections(me: AdminMeLike): {
       ],
     },
     {
+      title: "Users & Compliance",
+      items: [
+        {
+          label: "Users",
+          icon: <Users size={18} />,
+          anyOf: ["users.read"],
+          children: [
+            { href: "/admin/users/users", label: "All Users", icon: <Users size={14} /> },
+            { href: "/admin/users/users-funds", label: "User Funds", icon: <Wallet size={14} /> },
+          ],
+        },
+        {
+          label: "Verification",
+          icon: <ShieldCheck size={18} />,
+          anyOf: ["kyc.review"],
+          children: [
+            { href: "/admin/verification/kyc", label: "KYC Completed", icon: <UserCheck size={14} /> },
+          ],
+        },
+      ],
+    },
+    {
       title: "Trading",
       items: [
         {
@@ -143,32 +165,6 @@ function buildNavSections(me: AdminMeLike): {
         },
       ],
     },
-    
-    {
-      title: "Users & Compliance",
-      items: [
-        {
-          label: "Users",
-          icon: <Users size={18} />,
-          anyOf: ["users.read"],
-          children: [
-            { href: "/admin/users/users", label: "All Users", icon: <Users size={14} /> },
-            { href: "/admin/users/users-funds", label: "User Funds", icon: <Wallet size={14} /> },
-          ],
-        },
-        {
-          label: "Verification",
-          icon: <ShieldCheck size={18} />,
-          anyOf: ["kyc.review"],
-          children: [
-            { href: "/admin/verification/kyc", label: "KYC Completed", icon: <UserCheck size={14} /> },
-          ],
-        },
-        
-      ],
-      
-    },
-    
     {
       title: "Finance",
       items: [
