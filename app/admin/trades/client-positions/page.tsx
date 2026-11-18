@@ -38,6 +38,7 @@ import { canViewClientPositions } from "@/utils/adminPermissions";
 type Period = "today" | "7d" | "30d" | "mtd";
 type SideFilter = "ALL" | "BUY" | "SELL";
 type SlFilter = "ALL" | "WITH_SL" | "NO_SL";
+type PnlFilter = "ALL" | "PROFIT" | "LOSS";
 type SortKey = "lots_desc" | "lots_asc" | "profit_desc" | "loss_desc" | "risk_desc" | "newest";
 type PendingAction = { kind: "close" | "delete"; row: ClientPositionRow } | null;
 type ClosedView = {
@@ -115,6 +116,7 @@ export default function ClientPositionsPage() {
   const [symbolMenuOpen, setSymbolMenuOpen] = useState(false);
   const [side, setSide] = useState<SideFilter>("ALL");
   const [slFilter, setSlFilter] = useState<SlFilter>("ALL");
+  const [pnlFilter, setPnlFilter] = useState<PnlFilter>("ALL");
   const [sort, setSort] = useState<SortKey>("lots_desc");
   const [search, setSearch] = useState("");
   const [pending, setPending] = useState<PendingAction>(null);
@@ -197,6 +199,8 @@ export default function ClientPositionsPage() {
       if (side !== "ALL" && p.side !== side) return false;
       if (slFilter === "WITH_SL" && p.stopLoss == null) return false;
       if (slFilter === "NO_SL" && p.stopLoss != null) return false;
+      if (pnlFilter === "PROFIT" && !(Number(p.floatingPnL) > 0)) return false;
+      if (pnlFilter === "LOSS" && !(Number(p.floatingPnL) < 0)) return false;
       if (q) {
         const hay = `${p.userName} ${p.userEmail} ${p.accountNumber} ${p.ticket ?? ""} ${p.symbol}`.toLowerCase();
         if (!hay.includes(q)) return false;
@@ -213,13 +217,14 @@ export default function ClientPositionsPage() {
       newest: (a, b) => new Date(b.openTime).getTime() - new Date(a.openTime).getTime(),
     };
     return [...list].sort(sorters[sort]);
-  }, [data, symbol, side, slFilter, sort, search]);
+  }, [data, symbol, side, slFilter, pnlFilter, sort, search]);
 
   /** Long/Short/Avg cells → filter open positions to that script + side. */
   const applyScriptSideFilter = (sym: string, s: "BUY" | "SELL") => {
     setSymbol(sym);
     setSide(s);
     setSlFilter("ALL");
+    setPnlFilter("ALL");
     positionsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
@@ -641,7 +646,7 @@ export default function ClientPositionsPage() {
             <p className="text-[11px] text-[var(--text-muted)]">
               Risk % = loss if the stop loss is hit ÷ account equity.
             </p>
-            {(symbol || side !== "ALL" || slFilter !== "ALL" || search.trim()) ? (
+            {(symbol || side !== "ALL" || slFilter !== "ALL" || pnlFilter !== "ALL" || search.trim()) ? (
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 {symbol ? (
                   <FilterChip label={`Script: ${symbol}`} onClear={() => setSymbol(null)} />
@@ -658,6 +663,12 @@ export default function ClientPositionsPage() {
                     onClear={() => setSlFilter("ALL")}
                   />
                 ) : null}
+                {pnlFilter !== "ALL" ? (
+                  <FilterChip
+                    label={pnlFilter === "PROFIT" ? "Profit only" : "Loss only"}
+                    onClear={() => setPnlFilter("ALL")}
+                  />
+                ) : null}
                 {search.trim() ? (
                   <FilterChip label={`Search: “${search.trim()}”`} onClear={() => setSearch("")} />
                 ) : null}
@@ -669,6 +680,7 @@ export default function ClientPositionsPage() {
                     setSymbolMenuOpen(false);
                     setSide("ALL");
                     setSlFilter("ALL");
+                    setPnlFilter("ALL");
                     setSearch("");
                   }}
                   className="text-[11px] font-semibold text-[var(--primary)] hover:underline"
@@ -778,6 +790,15 @@ export default function ClientPositionsPage() {
                 { key: "NO_SL", label: "No SL" },
               ]}
               onChange={setSlFilter}
+            />
+            <Segmented
+              value={pnlFilter}
+              options={[
+                { key: "ALL", label: "All P/L" },
+                { key: "PROFIT", label: "Profit" },
+                { key: "LOSS", label: "Loss" },
+              ]}
+              onChange={setPnlFilter}
             />
             <select
               value={sort}
