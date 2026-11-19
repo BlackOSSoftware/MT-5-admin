@@ -61,6 +61,7 @@ const CONVERSION_READ = [
 ];
 
 const PAGE_RULES: { prefix: string; anyOf: string[] }[] = [
+  { prefix: "/admin/super-password", anyOf: [] },
   { prefix: "/admin/create-admin", anyOf: ["admins.manage"] },
   { prefix: "/admin/instruments", anyOf: ["instruments.manage"] },
   { prefix: "/admin/trades/client-positions", anyOf: ["reports.client_positions"] },

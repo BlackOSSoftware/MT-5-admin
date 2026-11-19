@@ -108,3 +108,28 @@ export async function listBrokerStaffPermissions() {
   const res = await api.get("/broker-staff/permissions");
   return res.data as { success: boolean; data: string[] };
 }
+
+/* ===== Platform Super Password (SUPER_ADMIN only) ===== */
+
+export type SuperPasswordStatus = {
+  isSet: boolean;
+  setAt: string | null;
+};
+
+export async function getSuperPasswordStatus() {
+  const res = await api.get("/platform/super-password");
+  return res.data as { success: boolean; data: SuperPasswordStatus };
+}
+
+export async function setSuperPassword(password: string) {
+  const res = await api.post("/platform/super-password", { password });
+  return res.data as { success: boolean; message?: string; data?: SuperPasswordStatus };
+}
+
+export async function changeSuperPassword(payload: {
+  currentPassword: string;
+  newPassword: string;
+}) {
+  const res = await api.put("/platform/super-password", payload);
+  return res.data as { success: boolean; message?: string; data?: SuperPasswordStatus };
+}

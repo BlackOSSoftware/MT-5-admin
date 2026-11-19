@@ -237,6 +237,15 @@ function buildNavSections(me: AdminMeLike): {
               label: "Reset Admin Password",
               icon: <Lock size={14} />,
             },
+            ...(me?.platformRole === "SUPER_ADMIN"
+              ? [
+                  {
+                    href: "/admin/super-password",
+                    label: "Super Password",
+                    icon: <Lock size={14} />,
+                  },
+                ]
+              : []),
           ],
         },
       ],
