@@ -660,3 +660,54 @@ export const getTradeAdminDeletedTrades = async (
   const res = await api.get("/trade-admin/trades/deleted", { params: query });
   return res.data as TradeAdminDeletedTradesResponse;
 };
+
+/* ============================
+   MANUAL PRICE (broker-scoped)
+============================ */
+
+export type ManualPriceResult = {
+  eventId?: string;
+  symbol?: string;
+  previousPrice?: number | null;
+  newPrice?: number;
+  positionsChecked?: number;
+  positionsClosed?: number;
+  affectedAccounts?: number;
+  clientsNotified?: number;
+  executedAt?: string;
+};
+
+export type ManualPriceEventItem = {
+  _id: string;
+  symbol: string;
+  prevBid?: number | null;
+  prevAsk?: number | null;
+  bid: number;
+  ask: number;
+  adminEmail?: string | null;
+  positionsChecked?: number;
+  positionsClosed?: number;
+  affectedAccounts?: number;
+  createdAt: string;
+};
+
+export const executeManualPrice = async (payload: {
+  symbol: string;
+  price: number;
+}): Promise<TradeAdminActionResponse<ManualPriceResult>> => {
+  const res = await api.post("/trade-admin/manual-price", payload);
+  return res.data as TradeAdminActionResponse<ManualPriceResult>;
+};
+
+export const getManualPriceEvents = async (params?: {
+  symbol?: string;
+  limit?: number;
+}): Promise<TradeAdminActionResponse<ManualPriceEventItem[]>> => {
+  const res = await api.get("/trade-admin/manual-price/events", {
+    params: {
+      ...(params?.symbol ? { symbol: params.symbol } : {}),
+      ...(params?.limit ? { limit: params.limit } : {}),
+    },
+  });
+  return res.data as TradeAdminActionResponse<ManualPriceEventItem[]>;
+};

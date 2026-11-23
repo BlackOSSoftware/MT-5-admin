@@ -30,8 +30,12 @@ import {
 import {
   closeTradeAdminPosition,
   deleteTradeAdminTrade,
+  executeManualPrice,
+  getManualPriceEvents,
   getTradeAdminClosedTrades,
   modifyTradeAdminPosition,
+  type ManualPriceEventItem,
+  type ManualPriceResult,
 } from "@/services/tradeAdmin.service";
 import { canViewClientPositions } from "@/utils/adminPermissions";
 
@@ -129,14 +133,24 @@ export default function ClientPositionsPage() {
   const symbolFilterRef = useRef<HTMLDivElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [manualPriceAdmin, setManualPriceAdmin] = useState(false);
+  const [mpSymbol, setMpSymbol] = useState("XAUUSD");
+  const [mpPrice, setMpPrice] = useState("");
+  const [mpConfirm, setMpConfirm] = useState(false);
+  const [mpBusy, setMpBusy] = useState(false);
+  const [mpResult, setMpResult] = useState<ManualPriceResult | null>(null);
+  const [mpEvents, setMpEvents] = useState<ManualPriceEventItem[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     adminService
       .getMe()
-      .then((me: { platformRole?: string; permissions?: string[] } | null) => {
+      .then((me: { platformRole?: string; permissions?: string[]; email?: string } | null) => {
         if (!cancelled) {
           setAllowed(canViewClientPositions(me));
+          setManualPriceAdmin(
+            String(me?.email || "").trim().toLowerCase() === "admin@oceanaprofx.com",
+          );
         }
       })
       .catch(() => !cancelled && setAllowed(false));
@@ -144,6 +158,46 @@ export default function ClientPositionsPage() {
       cancelled = true;
     };
   }, []);
+
+  // Load manual price audit events for the authorized admin.
+  useEffect(() => {
+    if (!manualPriceAdmin) return;
+    let cancelled = false;
+    getManualPriceEvents({ symbol: "XAUUSD", limit: 10 })
+      .then((res) => {
+        if (!cancelled) setMpEvents(res?.data ?? []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [manualPriceAdmin, mpResult]);
+
+  const submitManualPrice = async () => {
+    const price = Number(mpPrice);
+    if (!Number.isFinite(price) || price <= 0) {
+      setNotice({ type: "error", text: "Enter a valid price" });
+      return;
+    }
+    setMpBusy(true);
+    try {
+      const res = await executeManualPrice({ symbol: mpSymbol.trim().toUpperCase() || "XAUUSD", price });
+      const data = res?.data;
+      setMpResult(data ?? null);
+      setMpConfirm(false);
+      setMpPrice("");
+      setNotice({
+        type: "success",
+        text: `Price moved to ${price}. Checked ${data?.positionsChecked ?? 0} positions, closed ${data?.positionsClosed ?? 0}.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["client-position-report"] });
+    } catch (err) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setNotice({ type: "error", text: msg || "Manual price update failed" });
+    } finally {
+      setMpBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!notice) return;
@@ -460,6 +514,95 @@ export default function ClientPositionsPage() {
           tone="amber"
         />
       </div>
+
+      {/* MANUAL PRICE CONTROL — restricted to admin@oceanaprofx.com (backend enforced) */}
+      {manualPriceAdmin ? (
+        <section className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)]">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--card-border)] px-4 py-3">
+            <div>
+              <h2 className="text-sm font-semibold">Manual Price Control</h2>
+              <p className="text-[11px] text-[var(--text-muted)]">
+                Move XAUUSD price for your clients only. Stop losses are evaluated by the trading engine at the new price.
+              </p>
+            </div>
+            {mpResult ? (
+              <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-600">
+                Last: {mpResult.symbol} → {fmtPrice(mpResult.newPrice)} · checked {mpResult.positionsChecked ?? 0} · closed {mpResult.positionsClosed ?? 0}
+              </span>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-end gap-3 px-4 py-3">
+            <label className="flex flex-col gap-1 text-xs text-[var(--text-muted)]">
+              Symbol
+              <input
+                value={mpSymbol}
+                onChange={(e) => setMpSymbol(e.target.value.toUpperCase())}
+                className="h-9 w-32 rounded-lg border border-[var(--input-border)] bg-[var(--input-bg)] px-2.5 text-sm"
+                aria-label="Symbol"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-[var(--text-muted)]">
+              Target price
+              <input
+                value={mpPrice}
+                onChange={(e) => setMpPrice(e.target.value)}
+                inputMode="decimal"
+                placeholder="e.g. 4000"
+                className="h-9 w-36 rounded-lg border border-[var(--input-border)] bg-[var(--input-bg)] px-2.5 text-sm"
+                aria-label="Target price"
+              />
+            </label>
+            {!mpConfirm ? (
+              <button
+                type="button"
+                disabled={mpBusy || !mpPrice.trim()}
+                onClick={() => setMpConfirm(true)}
+                className="h-9 rounded-lg bg-[var(--primary)] px-4 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                Review &amp; move price
+              </button>
+            ) : (
+              <>
+                <span className="text-sm font-medium">
+                  Move {mpSymbol.toUpperCase()} to <b>{mpPrice}</b>?
+                </span>
+                <button
+                  type="button"
+                  disabled={mpBusy}
+                  onClick={submitManualPrice}
+                  className="h-9 rounded-lg bg-rose-600 px-4 text-sm font-semibold text-white disabled:opacity-50"
+                >
+                  {mpBusy ? "Executing…" : "Confirm"}
+                </button>
+                <button
+                  type="button"
+                  disabled={mpBusy}
+                  onClick={() => setMpConfirm(false)}
+                  className="h-9 rounded-lg border border-[var(--input-border)] px-4 text-sm"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
+          </div>
+          {mpEvents.length > 0 ? (
+            <div className="border-t border-[var(--card-border)] px-4 py-2">
+              <p className="mb-1 text-[11px] font-semibold uppercase text-[var(--text-muted)]">Recent movements</p>
+              <div className="flex flex-wrap gap-2">
+                {mpEvents.slice(0, 5).map((ev) => (
+                  <span
+                    key={ev._id}
+                    className="rounded-full border border-[var(--card-border)] px-2.5 py-1 text-[11px] text-[var(--text-muted)]"
+                    title={`${ev.adminEmail || "admin"} · checked ${ev.positionsChecked ?? 0} · closed ${ev.positionsClosed ?? 0}`}
+                  >
+                    {ev.symbol} {fmtPrice(ev.prevBid)} → {fmtPrice(ev.bid)} · {formatTime(ev.createdAt)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       {/* SCRIPTWISE */}
       <section className="overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--card-bg)]">
