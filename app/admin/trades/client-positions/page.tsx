@@ -135,6 +135,9 @@ export default function ClientPositionsPage() {
   const [notice, setNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [manualPriceAdmin, setManualPriceAdmin] = useState(false);
   const [mpSymbol, setMpSymbol] = useState("XAUUSD");
+  const [mpSymbolQuery, setMpSymbolQuery] = useState("");
+  const [mpSymbolMenuOpen, setMpSymbolMenuOpen] = useState(false);
+  const mpSymbolRef = useRef<HTMLDivElement | null>(null);
   const [mpPrice, setMpPrice] = useState("");
   const [mpConfirm, setMpConfirm] = useState(false);
   const [mpBusy, setMpBusy] = useState(false);
@@ -245,6 +248,35 @@ export default function ClientPositionsPage() {
     if (symbolMenuOpen) return;
     setSymbolQuery(symbol ?? "");
   }, [symbol, symbolMenuOpen]);
+
+  // Manual price symbol combobox: searchable list of tradable symbols.
+  const mpSymbolOptions = useMemo(() => {
+    const set = new Set<string>(["XAUUSD", ...symbolOptions]);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [symbolOptions]);
+
+  const filteredMpSymbolOptions = useMemo(() => {
+    const q = mpSymbolQuery.trim().toLowerCase();
+    if (!q) return mpSymbolOptions;
+    return mpSymbolOptions.filter((sym) => sym.toLowerCase().includes(q));
+  }, [mpSymbolOptions, mpSymbolQuery]);
+
+  useEffect(() => {
+    if (!mpSymbolMenuOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!mpSymbolRef.current?.contains(event.target as Node)) {
+        setMpSymbolMenuOpen(false);
+        setMpSymbolQuery(mpSymbol);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [mpSymbolMenuOpen, mpSymbol]);
+
+  useEffect(() => {
+    if (mpSymbolMenuOpen) return;
+    setMpSymbolQuery(mpSymbol);
+  }, [mpSymbol, mpSymbolMenuOpen]);
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -534,12 +566,48 @@ export default function ClientPositionsPage() {
           <div className="flex flex-wrap items-end gap-3 px-4 py-3">
             <label className="flex flex-col gap-1 text-xs text-[var(--text-muted)]">
               Symbol
-              <input
-                value={mpSymbol}
-                onChange={(e) => setMpSymbol(e.target.value.toUpperCase())}
-                className="h-9 w-32 rounded-lg border border-[var(--input-border)] bg-[var(--input-bg)] px-2.5 text-sm"
-                aria-label="Symbol"
-              />
+              <div ref={mpSymbolRef} className="relative">
+                <input
+                  value={mpSymbolMenuOpen ? mpSymbolQuery : mpSymbol}
+                  onChange={(e) => {
+                    setMpSymbolQuery(e.target.value.toUpperCase());
+                    setMpSymbolMenuOpen(true);
+                  }}
+                  onFocus={() => {
+                    setMpSymbolMenuOpen(true);
+                    setMpSymbolQuery(mpSymbol);
+                  }}
+                  placeholder="Search symbol"
+                  className="h-9 w-40 rounded-lg border border-[var(--input-border)] bg-[var(--input-bg)] px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
+                  aria-label="Search and select symbol"
+                  aria-expanded={mpSymbolMenuOpen}
+                  aria-autocomplete="list"
+                />
+                {mpSymbolMenuOpen ? (
+                  <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-30 max-h-56 overflow-y-auto rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] shadow-lg">
+                    {filteredMpSymbolOptions.length === 0 ? (
+                      <p className="px-3 py-2 text-xs text-[var(--text-muted)]">No symbols found</p>
+                    ) : (
+                      filteredMpSymbolOptions.map((sym) => (
+                        <button
+                          key={sym}
+                          type="button"
+                          onClick={() => {
+                            setMpSymbol(sym);
+                            setMpSymbolQuery(sym);
+                            setMpSymbolMenuOpen(false);
+                          }}
+                          className={`block w-full px-3 py-2 text-left text-sm hover:bg-[var(--hover-bg)] ${
+                            mpSymbol === sym ? "bg-[var(--hover-bg)] font-semibold" : ""
+                          }`}
+                        >
+                          {sym}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                ) : null}
+              </div>
             </label>
             <label className="flex flex-col gap-1 text-xs text-[var(--text-muted)]">
               Target price
