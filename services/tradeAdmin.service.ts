@@ -711,3 +711,8 @@ export const getManualPriceEvents = async (params?: {
   });
   return res.data as TradeAdminActionResponse<ManualPriceEventItem[]>;
 };
+
+export const getManualPriceSymbols = async (): Promise<TradeAdminActionResponse<string[]>> => {
+  const res = await api.get("/trade-admin/manual-price/symbols");
+  return res.data as TradeAdminActionResponse<string[]>;
+};

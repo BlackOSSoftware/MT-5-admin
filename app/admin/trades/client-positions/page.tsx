@@ -32,6 +32,7 @@ import {
   deleteTradeAdminTrade,
   executeManualPrice,
   getManualPriceEvents,
+  getManualPriceSymbols,
   getTradeAdminClosedTrades,
   modifyTradeAdminPosition,
   type ManualPriceEventItem,
@@ -143,6 +144,7 @@ export default function ClientPositionsPage() {
   const [mpBusy, setMpBusy] = useState(false);
   const [mpResult, setMpResult] = useState<ManualPriceResult | null>(null);
   const [mpEvents, setMpEvents] = useState<ManualPriceEventItem[]>([]);
+  const [mpAllSymbols, setMpAllSymbols] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -162,13 +164,18 @@ export default function ClientPositionsPage() {
     };
   }, []);
 
-  // Load manual price audit events for the authorized admin.
+  // Load manual price audit events + full engine symbol list for the authorized admin.
   useEffect(() => {
     if (!manualPriceAdmin) return;
     let cancelled = false;
     getManualPriceEvents({ symbol: "XAUUSD", limit: 10 })
       .then((res) => {
         if (!cancelled) setMpEvents(res?.data ?? []);
+      })
+      .catch(() => {});
+    getManualPriceSymbols()
+      .then((res) => {
+        if (!cancelled && Array.isArray(res?.data)) setMpAllSymbols(res.data);
       })
       .catch(() => {});
     return () => {
@@ -249,11 +256,11 @@ export default function ClientPositionsPage() {
     setSymbolQuery(symbol ?? "");
   }, [symbol, symbolMenuOpen]);
 
-  // Manual price symbol combobox: searchable list of tradable symbols.
+  // Manual price symbol combobox: ALL engine symbols + report symbols.
   const mpSymbolOptions = useMemo(() => {
-    const set = new Set<string>(["XAUUSD", ...symbolOptions]);
+    const set = new Set<string>(["XAUUSD", ...mpAllSymbols, ...symbolOptions]);
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [symbolOptions]);
+  }, [mpAllSymbols, symbolOptions]);
 
   const filteredMpSymbolOptions = useMemo(() => {
     const q = mpSymbolQuery.trim().toLowerCase();
