@@ -63,6 +63,27 @@ export async function fetchAdminUsers(
   return unwrapList<AdminUserListResponse>(data);
 }
 
+export type AdminDashboardStats = {
+  totalUsers: number;
+  kyc: {
+    verified: number;
+    pending: number;
+    rejected: number;
+    notStarted: number;
+  };
+  totalDeposit: number;
+  depositCount: number;
+  totalWithdraw: number;
+  withdrawCount: number;
+};
+
+export async function fetchAdminDashboardStats(): Promise<AdminDashboardStats> {
+  const { data } = await api.get<ApiEnvelope<AdminDashboardStats>>(
+    "/user/admin/dashboard-stats"
+  );
+  return unwrapApi<AdminDashboardStats>(data);
+}
+
 export async function fetchAdminUserById(
   userId: string
 ): Promise<AdminUserProfile> {

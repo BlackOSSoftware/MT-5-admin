@@ -10,11 +10,17 @@ import {
   Clock3,
   CandlestickChart,
   Gift,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  BadgeCheck,
+  Hourglass,
 } from "lucide-react";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useTradeAdminSummary } from "@/hooks/useTradeAdminSummary";
+import { useAdminDashboardStats } from "@/hooks/useAdminDashboardStats";
 import { useTradeAdminOpenTrades } from "@/hooks/useTradeAdminOpenTrades";
 import { useDefaultWatchlist } from "@/queries/defaultWatchlist.queries";
 import { useLiveQuotesBySymbols } from "@/hooks/useLiveQuotesBySymbols";
@@ -44,6 +50,10 @@ const item = {
 
 export default function Overview() {
   const { data: summary, isLoading } = useTradeAdminSummary();
+  const [isSuperAdmin] = useState(
+    () => typeof window !== "undefined" && localStorage.getItem("platformRole") === "SUPER_ADMIN"
+  );
+  const { data: dashStats } = useAdminDashboardStats();
   const openTradesQuery = useTradeAdminOpenTrades({
     page: 1,
     limit: 5,
@@ -224,6 +234,87 @@ export default function Overview() {
           </motion.div>
         ))}
       </motion.section>
+
+      {/* ================= FINANCE + KYC STATS (admin only) ================= */}
+      {!isSuperAdmin && dashStats ? (
+        <motion.section
+          variants={container}
+          className="px-3 sm:px-6 lg:px-0"
+        >
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
+            {/* Total Deposit */}
+            <motion.div
+              variants={item}
+              className="relative overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 ring-1 ring-white/5"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-white/12 via-transparent to-transparent pointer-events-none" />
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Total Deposit</p>
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-500/10 text-emerald-500">
+                  <ArrowDownToLine size={18} />
+                </span>
+              </div>
+              <p className="mt-2 text-xl sm:text-2xl font-bold text-emerald-500">
+                ${Number(dashStats.totalDeposit || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+              </p>
+              <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
+                {Number(dashStats.depositCount || 0).toLocaleString("en-IN")} deposits
+              </p>
+            </motion.div>
+
+            {/* Total Withdraw */}
+            <motion.div
+              variants={item}
+              className="relative overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 ring-1 ring-white/5"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-white/12 via-transparent to-transparent pointer-events-none" />
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Total Withdraw</p>
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-rose-500/10 text-rose-500">
+                  <ArrowUpFromLine size={18} />
+                </span>
+              </div>
+              <p className="mt-2 text-xl sm:text-2xl font-bold text-rose-500">
+                ${Number(dashStats.totalWithdraw || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+              </p>
+              <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
+                {Number(dashStats.withdrawCount || 0).toLocaleString("en-IN")} withdrawals
+              </p>
+            </motion.div>
+
+            {/* Total Users + KYC breakdown */}
+            <motion.div
+              variants={item}
+              className="relative overflow-hidden rounded-2xl border border-[var(--card-border)] bg-[var(--card-bg)] p-4 ring-1 ring-white/5 col-span-2 lg:col-span-1"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-white/12 via-transparent to-transparent pointer-events-none" />
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Total Users</p>
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-blue-500/10 text-blue-500">
+                  <Users size={18} />
+                </span>
+              </div>
+              <p className="mt-2 text-xl sm:text-2xl font-bold text-[var(--foreground)]">
+                {Number(dashStats.totalUsers || 0).toLocaleString("en-IN")}
+              </p>
+              <div className="mt-1 flex items-center gap-3 text-[11px]">
+                <span className="flex items-center gap-1 text-emerald-500">
+                  <BadgeCheck size={12} />
+                  KYC Complete: {Number(dashStats.kyc?.verified || 0).toLocaleString("en-IN")}
+                </span>
+                <span className="flex items-center gap-1 text-amber-500">
+                  <Hourglass size={12} />
+                  Pending: {Number(
+                    (dashStats.kyc?.pending || 0) +
+                      (dashStats.kyc?.notStarted || 0) +
+                      (dashStats.kyc?.rejected || 0)
+                  ).toLocaleString("en-IN")}
+                </span>
+              </div>
+            </motion.div>
+          </div>
+        </motion.section>
+      ) : null}
 
       {/* ================= MARKET WATCH (TOP 5) ================= */}
       <motion.section
