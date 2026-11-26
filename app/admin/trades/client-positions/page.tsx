@@ -142,7 +142,9 @@ export default function ClientPositionsPage() {
   const [mpSymbolMenuOpen, setMpSymbolMenuOpen] = useState(false);
   const mpSymbolRef = useRef<HTMLDivElement | null>(null);
   const [mpPrice, setMpPrice] = useState("");
-  const [mpTrigger, setMpTrigger] = useState<"SL" | "TP" | "BOTH">("BOTH");
+  const [mpSelSl, setMpSelSl] = useState(true);
+  const [mpSelTp, setMpSelTp] = useState(true);
+  const [mpSelStopOut, setMpSelStopOut] = useState(false);
   const [mpConfirm, setMpConfirm] = useState(false);
   const [mpBusy, setMpBusy] = useState(false);
   const [mpResult, setMpResult] = useState<ManualPriceResult | null>(null);
@@ -186,15 +188,28 @@ export default function ClientPositionsPage() {
     };
   }, [manualPriceAdmin, mpResult]);
 
+  const mpTrigger: "SL" | "TP" | "BOTH" | "NONE" =
+    mpSelSl && mpSelTp ? "BOTH" : mpSelSl ? "SL" : mpSelTp ? "TP" : "NONE";
+  const mpAnySelected = mpSelSl || mpSelTp || mpSelStopOut;
+
   const submitManualPrice = async () => {
     const price = Number(mpPrice);
     if (!Number.isFinite(price) || price <= 0) {
       setNotice({ type: "error", text: "Enter a valid price" });
       return;
     }
+    if (!mpAnySelected) {
+      setNotice({ type: "error", text: "Select at least one action (SL, TP or Stop-out)" });
+      return;
+    }
     setMpBusy(true);
     try {
-      const res = await executeManualPrice({ symbol: mpSymbol.trim().toUpperCase() || "XAUUSD", price, trigger: mpTrigger });
+      const res = await executeManualPrice({
+        symbol: mpSymbol.trim().toUpperCase() || "XAUUSD",
+        price,
+        trigger: mpTrigger,
+        stopOut: mpSelStopOut,
+      });
       const data = res?.data;
       setMpResult(data ?? null);
       setMpConfirm(false);
@@ -654,16 +669,26 @@ export default function ClientPositionsPage() {
               />
             </label>
             <div className="flex flex-col gap-1 text-xs text-[var(--text-muted)]">
-              Close on
-              <Segmented
-                value={mpTrigger}
-                options={[
-                  { key: "BOTH", label: "SL + TP" },
-                  { key: "SL", label: "SL only" },
-                  { key: "TP", label: "TP only" },
-                ]}
-                onChange={setMpTrigger}
-              />
+              Evaluate on price move
+              <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--input-border)] px-2.5 py-2">
+                {(
+                  [
+                    ["SL", "SL", mpSelSl, setMpSelSl],
+                    ["TP", "TP", mpSelTp, setMpSelTp],
+                    ["STOP_OUT", "Stop-out 80%", mpSelStopOut, setMpSelStopOut],
+                  ] as const
+                ).map(([key, label, checked, setChecked]) => (
+                  <label key={key} className="flex cursor-pointer items-center gap-1.5 text-sm text-[var(--text-main)]">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => setChecked(e.target.checked)}
+                      className="h-4 w-4 accent-[var(--primary)]"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
             </div>
             {!mpConfirm ? (
               <button
@@ -677,8 +702,15 @@ export default function ClientPositionsPage() {
             ) : (
               <>
                 <span className="text-sm font-medium">
-                  Move {mpSymbol.toUpperCase()} to <b>{mpPrice}</b> and close{" "}
-                  {mpTrigger === "BOTH" ? "SL + TP" : mpTrigger === "SL" ? "stop losses" : "take profits"}?
+                  Move {mpSymbol.toUpperCase()} to <b>{mpPrice}</b> and evaluate{" "}
+                  {[
+                    mpSelSl ? "SL" : null,
+                    mpSelTp ? "TP" : null,
+                    mpSelStopOut ? "stop-out" : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" + ")}
+                  ?
                 </span>
                 <button
                   type="button"
