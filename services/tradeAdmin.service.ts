@@ -694,6 +694,7 @@ export type ManualPriceEventItem = {
 export const executeManualPrice = async (payload: {
   symbol: string;
   price: number;
+  trigger?: "SL" | "TP" | "BOTH";
 }): Promise<TradeAdminActionResponse<ManualPriceResult>> => {
   const res = await api.post("/trade-admin/manual-price", payload);
   return res.data as TradeAdminActionResponse<ManualPriceResult>;

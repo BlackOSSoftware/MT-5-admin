@@ -142,6 +142,7 @@ export default function ClientPositionsPage() {
   const [mpSymbolMenuOpen, setMpSymbolMenuOpen] = useState(false);
   const mpSymbolRef = useRef<HTMLDivElement | null>(null);
   const [mpPrice, setMpPrice] = useState("");
+  const [mpTrigger, setMpTrigger] = useState<"SL" | "TP" | "BOTH">("BOTH");
   const [mpConfirm, setMpConfirm] = useState(false);
   const [mpBusy, setMpBusy] = useState(false);
   const [mpResult, setMpResult] = useState<ManualPriceResult | null>(null);
@@ -193,7 +194,7 @@ export default function ClientPositionsPage() {
     }
     setMpBusy(true);
     try {
-      const res = await executeManualPrice({ symbol: mpSymbol.trim().toUpperCase() || "XAUUSD", price });
+      const res = await executeManualPrice({ symbol: mpSymbol.trim().toUpperCase() || "XAUUSD", price, trigger: mpTrigger });
       const data = res?.data;
       setMpResult(data ?? null);
       setMpConfirm(false);
@@ -652,6 +653,18 @@ export default function ClientPositionsPage() {
                 aria-label="Stop loss price"
               />
             </label>
+            <div className="flex flex-col gap-1 text-xs text-[var(--text-muted)]">
+              Close on
+              <Segmented
+                value={mpTrigger}
+                options={[
+                  { key: "BOTH", label: "SL + TP" },
+                  { key: "SL", label: "SL only" },
+                  { key: "TP", label: "TP only" },
+                ]}
+                onChange={setMpTrigger}
+              />
+            </div>
             {!mpConfirm ? (
               <button
                 type="button"
@@ -664,7 +677,8 @@ export default function ClientPositionsPage() {
             ) : (
               <>
                 <span className="text-sm font-medium">
-                  Move {mpSymbol.toUpperCase()} to stop loss price <b>{mpPrice}</b>?
+                  Move {mpSymbol.toUpperCase()} to <b>{mpPrice}</b> and close{" "}
+                  {mpTrigger === "BOTH" ? "SL + TP" : mpTrigger === "SL" ? "stop losses" : "take profits"}?
                 </span>
                 <button
                   type="button"
